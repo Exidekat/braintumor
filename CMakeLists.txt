@@ -33,10 +33,16 @@ if (BUILD_SHARED_LIBS)
     target_compile_definitions(neuron PRIVATE -DNEURON_BUILD_SHARED_EXPORT)
 endif()
 
-target_compile_definitions(neuron PUBLIC VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+target_compile_definitions(neuron PRIVATE VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
 
 target_compile_definitions(neuron PUBLIC NEURON_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} NEURON_VERSION_MINOR=${PROJECT_VERSION_MINOR} NEURON_VERSION_PATCH=${PROJECT_VERSION_PATCH} NEURON_VERSION_STRING="${PROJECT_VERSION}")
 
 add_library(neuron::neuron ALIAS neuron)
 
 add_subdirectory(example)
+
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/run)
+
+add_custom_target(run_prep
+    COMMAND ${CMAKE_COMMAND} -E copy -t ${CMAKE_SOURCE_DIR}/run $<TARGET_RUNTIME_DLLS:example> $<TARGET_FILE:example>
+    COMMAND_EXPAND_LISTS)

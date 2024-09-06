@@ -19,18 +19,18 @@ namespace neuron::os {
         bool        resizable = false;
     };
 
-    class Window NEURON_API : public intfc::SurfaceProvider, public intfc::ExtentProvider {
+    class NEURON_API Window : public intfc::SurfaceProvider, public intfc::ExtentProvider {
       protected:
         explicit Window(const std::shared_ptr<Context> &context, const WindowSettings &settings);
 
       public:
         ~Window() override;
 
-        static NEURON_API std::shared_ptr<Window> create(const std::shared_ptr<Context> &context, const WindowSettings &window_settings);
+        static std::shared_ptr<Window> create(const std::shared_ptr<Context> &context, const WindowSettings &window_settings);
 
         virtual void post_init();
 
-        static NEURON_API void poll_events();
+        static void poll_events();
 
         [[nodiscard]] bool is_open() const;
 

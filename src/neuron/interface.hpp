@@ -8,14 +8,14 @@
 
 namespace neuron::intfc {
 
-    class SurfaceProvider NEURON_API {
+    class NEURON_API SurfaceProvider {
       public:
         virtual ~SurfaceProvider() = default;
 
         [[nodiscard]] virtual vk::SurfaceKHR get_surface() const = 0;
     };
 
-    class ExtentProvider NEURON_API {
+    class NEURON_API ExtentProvider {
         public:
         virtual ~ExtentProvider() = default;
 

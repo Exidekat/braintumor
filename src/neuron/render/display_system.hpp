@@ -43,11 +43,11 @@ namespace neuron::render {
         uint32_t current_frame;
     };
 
-    class DisplaySystem NEURON_API final {
+    class NEURON_API DisplaySystem final {
         DisplaySystem(const std::shared_ptr<Context> &context, const DisplaySystemSettings &settings, vk::SurfaceKHR surface);
 
       public:
-        static std::shared_ptr<DisplaySystem> NEURON_API create_raw(const std::shared_ptr<Context> &context, const DisplaySystemSettings &settings, vk::SurfaceKHR surface);
+        static std::shared_ptr<DisplaySystem> create_raw(const std::shared_ptr<Context> &context, const DisplaySystemSettings &settings, vk::SurfaceKHR surface);
 
         template <pointer_like<intfc::SurfaceProvider> T>
         static inline std::shared_ptr<DisplaySystem> create(const std::shared_ptr<Context> &context, const DisplaySystemSettings &settings, const T &provider) {

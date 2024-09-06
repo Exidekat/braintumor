@@ -22,7 +22,7 @@
 #include <GLFW/glfw3.h>
 
 namespace neuron {
-    class Context NEURON_API;
+    class NEURON_API Context;
 
 
     template<typename T, typename D>

@@ -53,9 +53,9 @@ namespace neuron {
         OptionalFeatureSet optional_features;
 
 
-        ContextSettings &NEURON_API set_naive_device_selection();
-        ContextSettings &NEURON_API set_device_index_selection(size_t index);
-        ContextSettings &NEURON_API set_custom_device_selector(std::function<vk::PhysicalDevice(const std::vector<vk::PhysicalDevice> &)> selector);
+        NEURON_API ContextSettings &set_naive_device_selection();
+        NEURON_API ContextSettings &set_device_index_selection(size_t index);
+        NEURON_API ContextSettings &set_custom_device_selector(std::function<vk::PhysicalDevice(const std::vector<vk::PhysicalDevice> &)> selector);
     };
 
     struct DebugUserData {
@@ -63,7 +63,7 @@ namespace neuron {
         void                *user_data;
     };
 
-    class Context final NEURON_API {
+    class NEURON_API Context final {
       public:
         explicit Context(const ContextSettings &settings);
 
