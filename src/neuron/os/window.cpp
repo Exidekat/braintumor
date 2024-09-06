@@ -11,7 +11,7 @@ namespace neuron::os {
     Window::Window(const std::shared_ptr<Context> &context, const WindowSettings &settings) : m_context(context) {
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, settings.resizable);
 
         m_window = glfwCreateWindow(settings.width, settings.height, settings.title.c_str(), nullptr, nullptr);
 

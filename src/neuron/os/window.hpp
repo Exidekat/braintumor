@@ -16,11 +16,12 @@ namespace neuron::os {
     struct WindowSettings {
         std::string title;
         int         width, height;
+        bool        resizable = false;
     };
 
     class Window NEURON_API : public intfc::SurfaceProvider, public intfc::ExtentProvider {
       protected:
-        explicit Window(const std::shared_ptr<Context>& context, const WindowSettings &settings);
+        explicit Window(const std::shared_ptr<Context> &context, const WindowSettings &settings);
 
       public:
         ~Window() override;

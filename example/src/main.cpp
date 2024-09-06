@@ -14,7 +14,7 @@ int main() {
         // .enable_api_dump       = true,
     });
 
-    auto window = neuron::os::Window::create(ctx, {"Hello!", 800, 600});
+    auto window = neuron::os::Window::create(ctx, {"Hello!", 800, 600, true});
 
     auto display_system = neuron::render::DisplaySystem::create(ctx, {.vsync = true}, window);
 
@@ -54,7 +54,7 @@ int main() {
         attachment.setStoreOp(vk::AttachmentStoreOp::eStore);
 
         cmd.beginRendering(vk::RenderingInfo{
-            {}, vk::Rect2D{{0, 0}, window->get_extent()}, 1, 0, attachment
+            {}, vk::Rect2D{{0, 0}, display_system->swapchain_config().extent}, 1, 0, attachment
         });
 
         cmd.endRendering();
