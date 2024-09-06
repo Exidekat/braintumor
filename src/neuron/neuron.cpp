@@ -51,6 +51,7 @@ namespace neuron {
 
         if (settings.enable_api_validation) {
             layers_set.insert("VK_LAYER_KHRONOS_validation");
+            instance_extensions_set.insert(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
 
         if (settings.enable_api_dump) {
