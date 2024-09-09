@@ -6,7 +6,59 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 include(FetchContent)
 
-find_package(Vulkan REQUIRED)
+
+message("$ENV{VULKAN_SDK}")
+
+# find vulkan sdk
+if (WIN32)
+    add_library(Vulkan::Vulkan STATIC IMPORTED)
+    set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Lib/vulkan-1.lib")
+    target_include_directories(Vulkan::Vulkan INTERFACE "$ENV{VULKAN_SDK}/Include/")
+
+    if (BUILD_SHARED_LIBS)
+        add_library(Vulkan::shaderc STATIC IMPORTED)
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Bin/shaderc_shared.dll")
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION_DEBUG "$ENV{VULKAN_SDK}/Bin/shaderc_sharedd.dll")
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_IMPLIB "$ENV{VULKAN_SDK}/Lib/shaderc_shared.lib")
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_IMPLIB_DEBUG "$ENV{VULKAN_SDK}/Lib/shaderc_sharedd.lib")
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_CONFIGURATIONS "RELEASE;DEBUG")
+        target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/Include/")
+    else()
+        add_library(Vulkan::shaderc STATIC IMPORTED)
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Lib/shaderc_combined.lib")
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION_DEBUG "$ENV{VULKAN_SDK}/Lib/shaderc_combinedd.lib")
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_CONFIGURATIONS "RELEASE;DEBUG")
+        target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/Include/")
+    endif()
+else() # Linux
+    if (BUILD_SHARED_LIBS)
+        find_library(Vulkan_LIB NAMES libvulkan.so)
+        find_library(Vulkan_LIB NAMES libshaderc_shared.so)
+
+        add_library(Vulkan::Vulkan STATIC IMPORTED)
+        set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/lib/libvulkan.so")
+        target_include_directories(Vulkan::Vulkan INTERFACE "$ENV{VULKAN_SDK}/include/")
+
+        add_library(Vulkan::shaderc SHARED IMPORTED)
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/lib/shaderc_shared.so")
+        target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/include/")
+    else()
+        find_library(Vulkan_LIB NAMES libvulkan.a)
+        find_library(Vulkan_LIB NAMES libshaderc_combined.a)
+
+        find_path
+
+        add_library(Vulkan::Vulkan STATIC IMPORTED)
+        set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION )
+        target_include_directories(Vulkan::Vulkan INTERFACE "$ENV{VULKAN_SDK}/include/")
+
+        add_library(Vulkan::shaderc STATIC IMPORTED)
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/lib/libshaderc_combined.a")
+        target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/include/")
+    endif()
+endif()
+
+
 
 FetchContent_Declare(
         glfw3
@@ -31,7 +83,8 @@ add_library(neuron src/neuron/neuron.cpp src/neuron/neuron.hpp
         src/neuron/render/graphics_pipeline.hpp
 )
 target_include_directories(neuron PUBLIC src/)
-target_link_libraries(neuron PUBLIC Vulkan::Vulkan glfw)
+target_link_libraries(neuron PUBLIC Vulkan::Vulkan Vulkan::shaderc glfw)
+
 
 if (BUILD_SHARED_LIBS)
     target_compile_definitions(neuron PUBLIC -DNEURON_BUILD_SHARED)
