@@ -1,6 +1,7 @@
 #include "neuron/neuron.hpp"
 #include "neuron/os/window.hpp"
 #include "neuron/render/display_system.hpp"
+#include "neuron/render/simple_render_pass.hpp"
 
 
 #include <iostream>
@@ -27,50 +28,17 @@ int main() {
 
         auto frame_info = display_system->acquire_next_frame();
 
+        auto render_area = vk::Rect2D{{0, 0}, display_system->swapchain_config().extent};
+
         vk::CommandBuffer cmd = command_buffers[frame_info.current_frame];
         cmd.reset();
         cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-        // ilt1
-        {
-            vk::ImageMemoryBarrier b{};
-            b.image            = frame_info.image;
-            b.srcAccessMask    = vk::AccessFlagBits::eNone;
-            b.dstAccessMask    = vk::AccessFlagBits::eColorAttachmentWrite;
-            b.oldLayout        = vk::ImageLayout::eUndefined;
-            b.newLayout        = vk::ImageLayout::eColorAttachmentOptimal;
-            b.subresourceRange = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+        neuron::render::SimpleRenderPassInfo pass_info{frame_info.image, frame_info.image_view, render_area, {0.0f, 1.0f, 0.0f, 1.0f}, true};
 
-            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, {}, {}, b);
-        }
+        neuron::render::simple_render_pass(cmd, pass_info, [&](const vk::CommandBuffer &cmd) {
 
-        vk::ClearColorValue clear_value{1.0f, 0.0f, 0.0f, 1.0f};
-
-        vk::RenderingAttachmentInfo attachment{};
-        attachment.setClearValue(clear_value);
-        attachment.setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-        attachment.setImageView(frame_info.image_view);
-        attachment.setLoadOp(vk::AttachmentLoadOp::eClear);
-        attachment.setStoreOp(vk::AttachmentStoreOp::eStore);
-
-        cmd.beginRendering(vk::RenderingInfo{
-            {}, vk::Rect2D{{0, 0}, display_system->swapchain_config().extent}, 1, 0, attachment
         });
-
-        cmd.endRendering();
-
-        // ilt2
-        {
-            vk::ImageMemoryBarrier b{};
-            b.image            = frame_info.image;
-            b.srcAccessMask    = vk::AccessFlagBits::eColorAttachmentWrite;
-            b.dstAccessMask    = vk::AccessFlagBits::eNone;
-            b.oldLayout        = vk::ImageLayout::eColorAttachmentOptimal;
-            b.newLayout        = vk::ImageLayout::ePresentSrcKHR;
-            b.subresourceRange = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
-
-            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, b);
-        }
 
         cmd.end();
 

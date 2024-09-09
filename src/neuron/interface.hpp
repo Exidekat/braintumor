@@ -21,4 +21,7 @@ namespace neuron::intfc {
 
         [[nodiscard]] virtual vk::Extent2D get_extent() const = 0;
     };
+
+
+    // TODO: render target interface
 } // namespace neuron::intfc

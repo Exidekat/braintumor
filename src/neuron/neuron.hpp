@@ -95,7 +95,7 @@ namespace neuron {
         uint32_t m_compute_queue_family;
 
         OptionalFeatureSet m_optional_features;
-        DebugUserData     *m_debug_user_data;
+        DebugUserData     *m_debug_user_data = nullptr;
     };
 
 } // namespace neuron

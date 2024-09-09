@@ -24,7 +24,12 @@ add_library(neuron src/neuron/neuron.cpp src/neuron/neuron.hpp
         src/neuron/os/window.hpp
         src/neuron/interface.hpp
         src/neuron/render/display_system.cpp
-        src/neuron/render/display_system.hpp)
+        src/neuron/render/display_system.hpp
+        src/neuron/render/simple_render_pass.cpp
+        src/neuron/render/simple_render_pass.hpp
+        src/neuron/render/graphics_pipeline.cpp
+        src/neuron/render/graphics_pipeline.hpp
+)
 target_include_directories(neuron PUBLIC src/)
 target_link_libraries(neuron PUBLIC Vulkan::Vulkan glfw)
 
