@@ -16,7 +16,7 @@ if (WIN32)
     target_include_directories(Vulkan::Vulkan INTERFACE "$ENV{VULKAN_SDK}/Include/")
 
     if (BUILD_SHARED_LIBS)
-        add_library(Vulkan::shaderc STATIC IMPORTED)
+        add_library(Vulkan::shaderc SHARED IMPORTED)
         set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Bin/shaderc_shared.dll")
         set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION_DEBUG "$ENV{VULKAN_SDK}/Bin/shaderc_sharedd.dll")
         set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_IMPLIB "$ENV{VULKAN_SDK}/Lib/shaderc_shared.lib")
@@ -31,31 +31,35 @@ if (WIN32)
         target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/Include/")
     endif()
 else() # Linux
+    find_path(Vulkan_INCLUDE NAMES vulkan/vulkan.hpp)
+    find_path(Shaderc_INCLUDE NAMES shaderc/shaderc.hpp)
+
     if (BUILD_SHARED_LIBS)
         find_library(Vulkan_LIB NAMES libvulkan.so)
-        find_library(Vulkan_LIB NAMES libshaderc_shared.so)
 
-        add_library(Vulkan::Vulkan STATIC IMPORTED)
-        set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/lib/libvulkan.so")
-        target_include_directories(Vulkan::Vulkan INTERFACE "$ENV{VULKAN_SDK}/include/")
+
+        add_library(Vulkan::Vulkan SHARED IMPORTED)
+        set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "${Vulkan_LIB}")
+
+
+        find_library(Shaderc_LIB NAMES libshaderc.so)
 
         add_library(Vulkan::shaderc SHARED IMPORTED)
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/lib/shaderc_shared.so")
-        target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/include/")
-    else()
-        find_library(Vulkan_LIB NAMES libvulkan.a)
-        find_library(Vulkan_LIB NAMES libshaderc_combined.a)
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "${Shaderc_LIB}")
 
-        find_path
+    else()
+        find_library(Vulkan_LIB NAMES libvulkan.a HINTS "$ENV{VULKAN_SDK}/lib")
+        find_library(Shaderc_LIB NAMES libshaderc_combined.a)
 
         add_library(Vulkan::Vulkan STATIC IMPORTED)
-        set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION )
-        target_include_directories(Vulkan::Vulkan INTERFACE "$ENV{VULKAN_SDK}/include/")
+        set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "${Vulkan_LIB}")
 
         add_library(Vulkan::shaderc STATIC IMPORTED)
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/lib/libshaderc_combined.a")
-        target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/include/")
+        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "${Shaderc_LIB}")
     endif()
+
+    target_include_directories(Vulkan::Vulkan INTERFACE "${Vulkan_INCLUDE}")
+    target_include_directories(Vulkan::shaderc INTERFACE "${Shaderc_INCLUDE}")
 endif()
 
 
