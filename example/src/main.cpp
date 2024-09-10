@@ -47,9 +47,15 @@ int main() {
     graphics_pipeline_builder.add_dynamic_state(vk::DynamicState::eViewport);
     graphics_pipeline_builder.add_dynamic_state(vk::DynamicState::eScissor);
 
+
     graphics_pipeline_builder.color_attachment_formats = { display_system->display_target_config().format };
 
     std::shared_ptr<neuron::render::GraphicsPipeline> graphics_pipeline = std::make_shared<neuron::render::GraphicsPipeline>(ctx, graphics_pipeline_builder);
+
+    double last_frame = -std::numeric_limits<double>::infinity();
+    double this_frame = glfwGetTime();
+
+    double best_fps = 0.0f;
 
     while (window->is_open()) {
         neuron::os::Window::poll_events();
@@ -87,9 +93,17 @@ int main() {
         // TODO: rendering. current setup will fail to run
 
         display_system->present_frame();
+
+        last_frame = this_frame;
+        this_frame = glfwGetTime();
+        double fps = 1.0 / (this_frame - last_frame);
+        best_fps = std::max(fps, best_fps);
     }
+
 
     ctx->device().waitIdle();
 
     ctx->device().destroy(command_pool);
+
+    std::cout << "Best FPS: " << best_fps << std::endl;
 }
