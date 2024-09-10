@@ -72,7 +72,13 @@ FetchContent_Declare(
         GIT_TAG        0af55ccecd98d4e5a8d1fad7de25ba429d60e863
 )
 
-FetchContent_MakeAvailable(glfw3 glm)
+FetchContent_Declare(
+        VulkanMemoryAllocator
+        GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+        GIT_TAG        009ecd192c1289c7529bff248a16cfe896254816
+)
+
+FetchContent_MakeAvailable(glfw3 glm VulkanMemoryAllocator)
 
 add_library(neuron src/neuron/neuron.cpp src/neuron/neuron.hpp
         src/neuron/neuron.cpp
@@ -91,7 +97,7 @@ add_library(neuron src/neuron/neuron.cpp src/neuron/neuron.hpp
         src/neuron/render/pipeline_layout.hpp
 )
 target_include_directories(neuron PUBLIC src/)
-target_link_libraries(neuron PUBLIC Vulkan::Vulkan Vulkan::shaderc glfw glm::glm)
+target_link_libraries(neuron PUBLIC Vulkan::Vulkan Vulkan::shaderc glfw glm::glm GPUOpen::VulkanMemoryAllocator)
 
 
 if (BUILD_SHARED_LIBS)

@@ -1,5 +1,7 @@
 #include "neuron.hpp"
 
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
@@ -208,11 +210,44 @@ namespace neuron {
         m_main_queue     = m_device.getQueue(m_main_queue_family, 0);
         m_transfer_queue = m_device.getQueue(m_transfer_queue_family, 0);
         m_compute_queue  = m_device.getQueue(m_compute_queue_family, 0);
+
+
+        // setup pipeline cache
+
+        // TODO: use actual cache dir (do this when updating to use proper application folders)
+        void* pc_init_data = nullptr;
+        size_t pc_init_data_size = 0;
+        if (std::filesystem::exists("pipeline_cache")) {
+            std::ifstream f("pipeline_cache", std::ios::ate | std::ios::binary);
+            pc_init_data_size = f.tellg();
+            pc_init_data = malloc(pc_init_data_size);
+            f.seekg(0);
+            f.read(static_cast<char*>(pc_init_data), pc_init_data_size);
+            f.close();
+        }
+
+        m_pipeline_cache = m_device.createPipelineCache({{}, pc_init_data_size, pc_init_data});
+
+        if (pc_init_data) {
+            free(pc_init_data);
+        }
     }
 
     Context::~Context() {
         if (m_instance) {
             if (m_device)
+                if (m_pipeline_cache) {
+                    auto data = m_device.getPipelineCacheData(m_pipeline_cache);
+                    {
+                        std::ofstream f("pipeline_cache", std::ios::binary | std::ios::out);
+                        f.write(reinterpret_cast<const char *>(data.data()), data.size());
+
+                        f.close();
+                    }
+
+                    m_device.destroy(m_pipeline_cache);
+                }
+
                 m_device.destroy();
 
             if (m_debug_messenger.has_value()) {
