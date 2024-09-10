@@ -11,55 +11,51 @@ message("$ENV{VULKAN_SDK}")
 
 # find vulkan sdk
 if (WIN32)
-    add_library(Vulkan::Vulkan STATIC IMPORTED)
-    set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Lib/vulkan-1.lib")
-    target_include_directories(Vulkan::Vulkan INTERFACE "$ENV{VULKAN_SDK}/Include/")
+  add_library(Vulkan::Vulkan STATIC IMPORTED)
+  set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Lib/vulkan-1.lib")
+  target_include_directories(Vulkan::Vulkan INTERFACE "$ENV{VULKAN_SDK}/Include/")
 
-    if (BUILD_SHARED_LIBS)
-        add_library(Vulkan::shaderc SHARED IMPORTED)
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Bin/shaderc_shared.dll")
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION_DEBUG "$ENV{VULKAN_SDK}/Bin/shaderc_sharedd.dll")
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_IMPLIB "$ENV{VULKAN_SDK}/Lib/shaderc_shared.lib")
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_IMPLIB_DEBUG "$ENV{VULKAN_SDK}/Lib/shaderc_sharedd.lib")
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_CONFIGURATIONS "RELEASE;DEBUG")
-        target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/Include/")
-    else()
-        add_library(Vulkan::shaderc STATIC IMPORTED)
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Lib/shaderc_combined.lib")
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION_DEBUG "$ENV{VULKAN_SDK}/Lib/shaderc_combinedd.lib")
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_CONFIGURATIONS "RELEASE;DEBUG")
-        target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/Include/")
-    endif()
+  if (BUILD_SHARED_LIBS)
+    add_library(Vulkan::shaderc SHARED IMPORTED)
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Bin/shaderc_shared.dll")
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION_DEBUG "$ENV{VULKAN_SDK}/Bin/shaderc_sharedd.dll")
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_IMPLIB "$ENV{VULKAN_SDK}/Lib/shaderc_shared.lib")
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_IMPLIB_DEBUG "$ENV{VULKAN_SDK}/Lib/shaderc_sharedd.lib")
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_CONFIGURATIONS "RELEASE;DEBUG")
+    target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/Include/")
+  else()
+    add_library(Vulkan::shaderc STATIC IMPORTED)
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "$ENV{VULKAN_SDK}/Lib/shaderc_combined.lib")
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION_DEBUG "$ENV{VULKAN_SDK}/Lib/shaderc_combinedd.lib")
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_CONFIGURATIONS "RELEASE;DEBUG")
+    target_include_directories(Vulkan::shaderc INTERFACE "$ENV{VULKAN_SDK}/Include/")
+  endif()
 else() # Linux
-    find_path(Vulkan_INCLUDE NAMES vulkan/vulkan.hpp)
-    find_path(Shaderc_INCLUDE NAMES shaderc/shaderc.hpp)
-
-    if (BUILD_SHARED_LIBS)
-        find_library(Vulkan_LIB NAMES libvulkan.so)
+  find_path(Vulkan_INCLUDE NAMES vulkan/vulkan.hpp)
+  find_path(Shaderc_INCLUDE NAMES shaderc/shaderc.hpp)
 
 
-        add_library(Vulkan::Vulkan SHARED IMPORTED)
-        set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "${Vulkan_LIB}")
+  find_library(Vulkan_LIB NAMES libvulkan.so)
+  add_library(Vulkan::Vulkan SHARED IMPORTED)
+  set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "${Vulkan_LIB}")
+
+  if (BUILD_SHARED_LIBS)
 
 
-        find_library(Shaderc_LIB NAMES libshaderc.so)
+    find_library(Shaderc_LIB NAMES libshaderc_shared.so libshaderc.so)
 
-        add_library(Vulkan::shaderc SHARED IMPORTED)
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "${Shaderc_LIB}")
+    add_library(Vulkan::shaderc SHARED IMPORTED)
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "${Shaderc_LIB}")
 
-    else()
-        find_library(Vulkan_LIB NAMES libvulkan.a HINTS "$ENV{VULKAN_SDK}/lib")
-        find_library(Shaderc_LIB NAMES libshaderc_combined.a)
+  else()
+    find_library(Shaderc_LIB NAMES libshaderc_combined.a)
 
-        add_library(Vulkan::Vulkan STATIC IMPORTED)
-        set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "${Vulkan_LIB}")
+    add_library(Vulkan::shaderc STATIC IMPORTED)
+    set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "${Shaderc_LIB}")
+  endif()
 
-        add_library(Vulkan::shaderc STATIC IMPORTED)
-        set_property(TARGET Vulkan::shaderc PROPERTY IMPORTED_LOCATION "${Shaderc_LIB}")
-    endif()
-
-    target_include_directories(Vulkan::Vulkan INTERFACE "${Vulkan_INCLUDE}")
-    target_include_directories(Vulkan::shaderc INTERFACE "${Shaderc_INCLUDE}")
+  target_include_directories(Vulkan::Vulkan INTERFACE "${Vulkan_INCLUDE}")
+  target_include_directories(Vulkan::shaderc INTERFACE "${Shaderc_INCLUDE}")
 endif()
 
 
@@ -93,8 +89,8 @@ target_link_libraries(neuron PUBLIC Vulkan::Vulkan Vulkan::shaderc glfw)
 
 
 if (BUILD_SHARED_LIBS)
-    target_compile_definitions(neuron PUBLIC -DNEURON_BUILD_SHARED)
-    target_compile_definitions(neuron PRIVATE -DNEURON_BUILD_SHARED_EXPORT)
+  target_compile_definitions(neuron PUBLIC -DNEURON_BUILD_SHARED)
+  target_compile_definitions(neuron PRIVATE -DNEURON_BUILD_SHARED_EXPORT)
 endif()
 
 target_compile_definitions(neuron PRIVATE VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)

@@ -5,6 +5,7 @@
 #include "display_system.hpp"
 
 #include <iostream>
+#include <limits>
 
 namespace neuron::render {
     vk::PresentModeKHR select_present_mode(const std::vector<vk::PresentModeKHR> &present_modes, bool vsync) {
