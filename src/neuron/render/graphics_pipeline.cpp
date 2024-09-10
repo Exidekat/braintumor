@@ -220,18 +220,78 @@ namespace neuron::render {
     }
 
     GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_standard_blend_attachment() {
-        color_blend_attachments.push_back(vk::PipelineColorBlendAttachmentState{
-            true,
-            vk::BlendFactor::eSrcAlpha,
-            vk::BlendFactor::eOneMinusSrcAlpha,
-            vk::BlendOp::eAdd,
-            vk::BlendFactor::eOne,
-            vk::BlendFactor::eZero,
-            vk::BlendOp::eAdd,
-            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-        });
+        color_blend_attachments.emplace_back(true, vk::BlendFactor::eSrcAlpha, vk::BlendFactor::eOneMinusSrcAlpha, vk::BlendOp::eAdd, vk::BlendFactor::eOne, vk::BlendFactor::eZero,
+                                             vk::BlendOp::eAdd,
+                                             vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
 
         return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_viewport(const glm::fvec2 &pos, const vk::Extent2D &extent, float min_depth, float max_depth) {
+        viewports.emplace_back(pos.x, pos.y, static_cast<float>(extent.width), static_cast<float>(extent.height), min_depth, max_depth);
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_viewport(const glm::fvec2 &pos, const glm::fvec2 &extent, float min_depth, float max_depth) {
+        viewports.emplace_back(pos.x, pos.y, extent.x, extent.y, min_depth, max_depth);
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_scissor(const vk::Rect2D &scissor) {
+        scissors.push_back(scissor);
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_scissor(const vk::Offset2D &offset, const vk::Extent2D &extent) {
+        scissors.emplace_back(offset, extent);
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_color_attachment_with_standard_blend(vk::Format format) {
+        size_t index = std::max(color_blend_attachments.size(), color_blend_attachments.size());
+        set_standard_blend_attachment(index);
+        set_color_attachment_format(index, format);
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::set_color_attachment_format(size_t index, vk::Format format) {
+        if (index >= color_attachment_formats.size()) {
+            color_attachment_formats.resize(index + 1);
+        }
+
+        color_attachment_formats[index] = format;
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::set_depth_attachment_format(vk::Format format) {
+        depth_format = format;
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::set_stencil_attachment_format(vk::Format format) {
+        stencil_format = format;
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::set_blend_attachment(size_t index, const vk::PipelineColorBlendAttachmentState &blend_attachment) {
+        if (index >= color_blend_attachments.size()) {
+            color_blend_attachments.resize(index + 1);
+        }
+
+        color_blend_attachments[index] = blend_attachment;
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::set_standard_blend_attachment(size_t index) {
+        set_blend_attachment(index,
+                             {true, vk::BlendFactor::eSrcAlpha, vk::BlendFactor::eOneMinusSrcAlpha, vk::BlendOp::eAdd, vk::BlendFactor::eOne, vk::BlendFactor::eZero,
+                              vk::BlendOp::eAdd,
+                              vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA});
+        return *this;
+    }
+
+    std::shared_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build(const std::shared_ptr<Context> &ctx) {
+        return std::make_shared<GraphicsPipeline>(ctx, *this);
     }
 
     GraphicsPipeline::GraphicsPipeline(const std::shared_ptr<Context> &context, const GraphicsPipelineBuilder &builder) : m_context(context) {
@@ -345,6 +405,8 @@ namespace neuron::render {
         pipeline_create_info.setBasePipelineIndex(builder.base_pipeline_index);
 
         pipeline_create_info.pNext = &pipeline_rendering;
+        GraphicsPipelineBuilder &add_scissor(const vk::Offset2D &offset, const vk::Extent2D &extent);
+
 
         m_pipeline =
             m_context->device().createGraphicsPipeline(m_context->pipeline_cache(), pipeline_create_info).value; // TODO: do something sort of checking on the actual result.

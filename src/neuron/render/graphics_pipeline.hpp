@@ -53,6 +53,8 @@ namespace neuron::render {
         // TODO: specialization info
     };
 
+    class GraphicsPipeline;
+
     struct NEURON_API GraphicsPipelineBuilder {
         std::vector<ShaderStageDefinition>               shader_stages;
         std::unordered_set<vk::DynamicState>             dynamic_states;
@@ -122,7 +124,20 @@ namespace neuron::render {
         GraphicsPipelineBuilder &add_vertex_binding(uint32_t binding, uint32_t stride, vk::VertexInputRate input_rate = vk::VertexInputRate::eVertex);
         GraphicsPipelineBuilder &add_vertex_attribute(uint32_t binding, uint32_t location, vk::Format format, uint32_t offset);
         GraphicsPipelineBuilder &add_standard_blend_attachment();
-        GraphicsPipelineBuilder &add_viewport(const glm::fvec2& )
+        GraphicsPipelineBuilder &add_viewport(const glm::fvec2& pos, const vk::Extent2D& extent, float min_depth, float max_depth);
+        GraphicsPipelineBuilder &add_viewport(const glm::fvec2& pos, const glm::fvec2& extent, float min_depth, float max_depth);
+        GraphicsPipelineBuilder &add_scissor(const vk::Rect2D& scissor);
+        GraphicsPipelineBuilder &add_scissor(const vk::Offset2D& offset, const vk::Extent2D& extent);
+        GraphicsPipelineBuilder &add_color_attachment_with_standard_blend(vk::Format format);
+        GraphicsPipelineBuilder &set_color_attachment_format(size_t index, vk::Format format);
+        GraphicsPipelineBuilder &set_depth_attachment_format(vk::Format format);
+        GraphicsPipelineBuilder &set_stencil_attachment_format(vk::Format format);
+        GraphicsPipelineBuilder &set_blend_attachment(size_t index, const vk::PipelineColorBlendAttachmentState& blend_attachment);
+        GraphicsPipelineBuilder &set_standard_blend_attachment(size_t index);
+
+        std::shared_ptr<GraphicsPipeline> build(const std::shared_ptr<Context> &ctx);
+
+        explicit inline GraphicsPipelineBuilder(const std::shared_ptr<PipelineLayout> &layout_) : layout(layout_) {}
     };
 
     class NEURON_API GraphicsPipeline {

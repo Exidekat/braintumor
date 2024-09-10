@@ -16,32 +16,30 @@ int main() {
         // .enable_api_dump       = true,
     });
 
-    auto window = neuron::os::Window::create(ctx, {"Hello!", 800, 600, true});
+    auto         window          = neuron::os::Window::create(ctx, {"Hello!", 800, 600, true});
+    vk::Extent2D original_extent = window->get_extent();
+
 
     auto display_system = neuron::render::DisplaySystem::create(ctx, {.vsync = true}, window);
 
     auto command_pool    = std::make_shared<neuron::CommandPool>(ctx, ctx->main_queue_family(), true);
     auto command_buffers = command_pool->allocate_command_buffers(neuron::render::DisplaySystem::MAX_FRAMES_IN_FLIGHT);
 
-    auto pipeline_layout = std::make_shared<neuron::render::PipelineLayout>(ctx);
+    // auto pipline_layout_builder
 
-    auto graphics_pipeline_builder = neuron::render::GraphicsPipelineBuilder{.layout = pipeline_layout};
-    graphics_pipeline_builder.add_glsl_shader("res/shaders/main.vert")
-        .add_glsl_shader("res/shaders/main.frag")
-        .add_standard_blend_attachment()
-        .add_dynamic_state(vk::DynamicState::eViewport)
-        .add_dynamic_state(vk::DynamicState::eScissor)
-        .add_viewport({0.0f, 0.0f}, we, 0.0f, 1.0f);
+    auto pipeline_layout = neuron::render::PipelineLayoutBuilder().add_push_constant_range(vk::ShaderStageFlagBits::eVertex, 0, 4).build(ctx);
 
-    vk::Extent2D we = window->get_extent();
-
-    graphics_pipeline_builder.viewports.emplace_back(0.0f, 0.0f, static_cast<float>(we.width), static_cast<float>(we.height), 0.0f, 1.0f);
-    graphics_pipeline_builder.scissors.emplace_back(vk::Offset2D{0, 0}, we);
-
-
-    graphics_pipeline_builder.color_attachment_formats = {display_system->display_target_config().format};
-
-    std::shared_ptr<neuron::render::GraphicsPipeline> graphics_pipeline = std::make_shared<neuron::render::GraphicsPipeline>(ctx, graphics_pipeline_builder);
+    auto graphics_pipeline = neuron::render::GraphicsPipelineBuilder(pipeline_layout)
+                                 .add_glsl_shader("res/shaders/main.vert")
+                                 .add_glsl_shader("res/shaders/main.frag")
+                                 .add_viewport({0.0f, 0.0f}, original_extent, 0.0f, 1.0f)
+                                 .add_scissor({0, 0}, original_extent)
+                                 .add_dynamic_state(vk::DynamicState::eViewport)
+                                 .add_dynamic_state(vk::DynamicState::eScissor)
+                                 .add_color_attachment_with_standard_blend(display_system->display_target_config().format)
+                                 .set_depth_attachment_format(vk::Format::eD24UnormS8Uint)
+                                 .set_stencil_attachment_format(vk::Format::eD24UnormS8Uint)
+                                 .build(ctx);
 
     double last_frame = -std::numeric_limits<double>::infinity();
     double this_frame = glfwGetTime();
@@ -64,9 +62,13 @@ int main() {
         neuron::render::simple_render_pass(cmd, pass_info, [&](const vk::CommandBuffer &cmd) {
             cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, graphics_pipeline->pipeline());
             cmd.setViewport(0, vk::Viewport{0.0f, 0.0f, static_cast<float>(render_area.extent.width), static_cast<float>(render_area.extent.height), 0.0f, 1.0f});
-            vk::Rect2D s = {{0, 0}, {render_area.extent.width / 2, render_area.extent.height}};
 
+            vk::Rect2D s = {{0, 0}, {render_area.extent.width / 2, render_area.extent.height}};
             cmd.setScissor(0, s);
+
+            const auto time = static_cast<float>(glfwGetTime());
+
+            cmd.pushConstants(pipeline_layout->pipeline_layout(), vk::ShaderStageFlagBits::eVertex, 0, 4, &time);
 
             cmd.draw(3, 1, 0, 0);
 
@@ -101,8 +103,6 @@ int main() {
 
 
     ctx->device().waitIdle();
-
-    ctx->device().destroy(command_pool);
 
     std::cout << "Best FPS: " << best_fps << std::endl;
 }
