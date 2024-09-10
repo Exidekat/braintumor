@@ -305,6 +305,12 @@ namespace neuron::render {
         color_blend_state.setAttachments(builder.color_blend_attachments);
         color_blend_state.setBlendConstants(builder.blend_constants);
 
+        vk::PipelineRenderingCreateInfo pipeline_rendering{};
+        pipeline_rendering.setColorAttachmentFormats(builder.color_attachment_formats);
+        pipeline_rendering.setDepthAttachmentFormat(builder.depth_format);
+        pipeline_rendering.setStencilAttachmentFormat(builder.stencil_format);
+
+
         vk::GraphicsPipelineCreateInfo pipeline_create_info = {};
         pipeline_create_info.setStages(stages);
         pipeline_create_info.setPVertexInputState(&vertex_input_state);
@@ -321,6 +327,8 @@ namespace neuron::render {
         pipeline_create_info.setSubpass(builder.subpass);
         pipeline_create_info.setBasePipelineHandle(builder.base_pipeline);
         pipeline_create_info.setBasePipelineIndex(builder.base_pipeline_index);
+
+        pipeline_create_info.pNext = &pipeline_rendering;
 
         m_pipeline = m_context->device().createGraphicsPipeline(m_context->pipeline_cache(), pipeline_create_info).value; // TODO: do something sort of checking on the actual result.
     }

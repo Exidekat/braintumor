@@ -14,7 +14,7 @@ namespace neuron::render {
         bool present_compatible;
 
         vk::ImageLayout           target_layout = vk::ImageLayout::eColorAttachmentOptimal;
-        vk::AccessFlags           target_access = vk::AccessFlagBits::eColorAttachmentWrite;
+        vk::AccessFlags           target_access = vk::AccessFlagBits::eColorAttachmentRead;
         vk::PipelineStageFlags    target_stage  = vk::PipelineStageFlagBits::eColorAttachmentOutput;
         vk::ImageSubresourceRange isr           = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
     };

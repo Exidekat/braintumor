@@ -41,11 +41,13 @@ int main() {
 
     vk::Extent2D we = window->get_extent();
 
-    graphics_pipeline_builder.viewports.emplace_back(0.0f, 0.0f, static_cast<float>(we.width), static_cast<float>(we.height), 0.0f, 100.0f);
+    graphics_pipeline_builder.viewports.emplace_back(0.0f, 0.0f, static_cast<float>(we.width), static_cast<float>(we.height), 0.0f, 1.0f);
     graphics_pipeline_builder.scissors.emplace_back(vk::Offset2D{0, 0}, we);
 
     graphics_pipeline_builder.add_dynamic_state(vk::DynamicState::eViewport);
     graphics_pipeline_builder.add_dynamic_state(vk::DynamicState::eScissor);
+
+    graphics_pipeline_builder.color_attachment_formats = { display_system->display_target_config().format };
 
     std::shared_ptr<neuron::render::GraphicsPipeline> graphics_pipeline = std::make_shared<neuron::render::GraphicsPipeline>(ctx, graphics_pipeline_builder);
 
@@ -64,7 +66,7 @@ int main() {
 
         neuron::render::simple_render_pass(cmd, pass_info, [&](const vk::CommandBuffer &cmd) {
             cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, graphics_pipeline->pipeline());
-            cmd.setViewport(0, vk::Viewport{0.0f, 0.0f, static_cast<float>(render_area.extent.width), static_cast<float>(render_area.extent.height), 0.0f, 100.0f});
+            cmd.setViewport(0, vk::Viewport{0.0f, 0.0f, static_cast<float>(render_area.extent.width), static_cast<float>(render_area.extent.height), 0.0f, 1.0f});
             cmd.setScissor(0, render_area);
 
             cmd.draw(3, 1, 0, 0);

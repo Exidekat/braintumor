@@ -106,6 +106,10 @@ namespace neuron::render {
         vk::Pipeline base_pipeline       = VK_NULL_HANDLE;
         int32_t      base_pipeline_index = -1;
 
+        std::vector<vk::Format> color_attachment_formats;
+        vk::Format depth_format;
+        vk::Format stencil_format;
+
 
         GraphicsPipelineBuilder &add_shader(const ShaderStageDefinition &def);
         GraphicsPipelineBuilder &add_shader(vk::ShaderStageFlagBits stage, const ShaderModuleInfo &module);
