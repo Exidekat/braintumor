@@ -66,7 +66,13 @@ FetchContent_Declare(
         GIT_TAG        7b6aead9fb88b3623e3b3725ebb42670cbe4c579
 )
 
-FetchContent_MakeAvailable(glfw3)
+FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG        0af55ccecd98d4e5a8d1fad7de25ba429d60e863
+)
+
+FetchContent_MakeAvailable(glfw3 glm)
 
 add_library(neuron src/neuron/neuron.cpp src/neuron/neuron.hpp
         src/neuron/neuron.cpp
@@ -85,7 +91,7 @@ add_library(neuron src/neuron/neuron.cpp src/neuron/neuron.hpp
         src/neuron/render/pipeline_layout.hpp
 )
 target_include_directories(neuron PUBLIC src/)
-target_link_libraries(neuron PUBLIC Vulkan::Vulkan Vulkan::shaderc glfw)
+target_link_libraries(neuron PUBLIC Vulkan::Vulkan Vulkan::shaderc glfw glm::glm)
 
 
 if (BUILD_SHARED_LIBS)

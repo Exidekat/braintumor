@@ -101,4 +101,19 @@ namespace neuron {
         vk::PipelineCache m_pipeline_cache = VK_NULL_HANDLE;
     };
 
+    class NEURON_API CommandPool {
+      public:
+        CommandPool(const std::shared_ptr<Context> &context, uint32_t queue_family, bool resettable = false);
+        ~CommandPool();
+
+        [[nodiscard]] std::vector<vk::CommandBuffer> allocate_command_buffers(uint32_t count, vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) const;
+        [[nodiscard]] vk::CommandBuffer allocate_command_buffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) const;
+
+        void free_command_buffers(const std::vector<vk::CommandBuffer> &command_buffers) const;
+      private:
+
+        std::shared_ptr<Context> m_context;
+        vk::CommandPool m_command_pool;
+    };
+
 } // namespace neuron

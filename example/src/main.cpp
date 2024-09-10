@@ -20,35 +20,26 @@ int main() {
 
     auto display_system = neuron::render::DisplaySystem::create(ctx, {.vsync = true}, window);
 
-    vk::CommandPool command_pool = ctx->device().createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx->main_queue_family()));
-    std::vector<vk::CommandBuffer> command_buffers = ctx->device().allocateCommandBuffers(
-        vk::CommandBufferAllocateInfo(command_pool, vk::CommandBufferLevel::ePrimary, neuron::render::DisplaySystem::MAX_FRAMES_IN_FLIGHT));
+    auto command_pool    = std::make_shared<neuron::CommandPool>(ctx, ctx->main_queue_family(), true);
+    auto command_buffers = command_pool->allocate_command_buffers(neuron::render::DisplaySystem::MAX_FRAMES_IN_FLIGHT);
 
     auto pipeline_layout = std::make_shared<neuron::render::PipelineLayout>(ctx);
 
     auto graphics_pipeline_builder = neuron::render::GraphicsPipelineBuilder{.layout = pipeline_layout};
-    graphics_pipeline_builder.add_glsl_shader("res/shaders/main.vert").add_glsl_shader("res/shaders/main.frag");
-    graphics_pipeline_builder.add_blend_attachment(vk::PipelineColorBlendAttachmentState{
-        true,
-        vk::BlendFactor::eSrcAlpha,
-        vk::BlendFactor::eOneMinusSrcAlpha,
-        vk::BlendOp::eAdd,
-        vk::BlendFactor::eOne,
-        vk::BlendFactor::eZero,
-        vk::BlendOp::eAdd,
-        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-    });
+    graphics_pipeline_builder.add_glsl_shader("res/shaders/main.vert")
+        .add_glsl_shader("res/shaders/main.frag")
+        .add_standard_blend_attachment()
+        .add_dynamic_state(vk::DynamicState::eViewport)
+        .add_dynamic_state(vk::DynamicState::eScissor)
+        .add_viewport({0.0f, 0.0f}, we, 0.0f, 1.0f);
 
     vk::Extent2D we = window->get_extent();
 
     graphics_pipeline_builder.viewports.emplace_back(0.0f, 0.0f, static_cast<float>(we.width), static_cast<float>(we.height), 0.0f, 1.0f);
     graphics_pipeline_builder.scissors.emplace_back(vk::Offset2D{0, 0}, we);
 
-    graphics_pipeline_builder.add_dynamic_state(vk::DynamicState::eViewport);
-    graphics_pipeline_builder.add_dynamic_state(vk::DynamicState::eScissor);
 
-
-    graphics_pipeline_builder.color_attachment_formats = { display_system->display_target_config().format };
+    graphics_pipeline_builder.color_attachment_formats = {display_system->display_target_config().format};
 
     std::shared_ptr<neuron::render::GraphicsPipeline> graphics_pipeline = std::make_shared<neuron::render::GraphicsPipeline>(ctx, graphics_pipeline_builder);
 
@@ -68,14 +59,22 @@ int main() {
         cmd.reset();
         cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-        neuron::render::SimpleRenderPassInfo pass_info{frame_info.image, frame_info.image_view, render_area, {0.0f, 1.0f, 0.0f, 1.0f}, true};
+        neuron::render::SimpleRenderPassInfo pass_info{frame_info.image, frame_info.image_view, render_area, {0.0f, 0.0f, 0.0f, 1.0f}, true};
 
         neuron::render::simple_render_pass(cmd, pass_info, [&](const vk::CommandBuffer &cmd) {
             cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, graphics_pipeline->pipeline());
             cmd.setViewport(0, vk::Viewport{0.0f, 0.0f, static_cast<float>(render_area.extent.width), static_cast<float>(render_area.extent.height), 0.0f, 1.0f});
-            cmd.setScissor(0, render_area);
+            vk::Rect2D s = {{0, 0}, {render_area.extent.width / 2, render_area.extent.height}};
+
+            cmd.setScissor(0, s);
 
             cmd.draw(3, 1, 0, 0);
+
+
+            s.offset.x = static_cast<int>(render_area.extent.width) / 2;
+            cmd.setScissor(0, s);
+
+            cmd.draw(3, 1, 0, 1);
         });
 
         cmd.end();
@@ -97,7 +96,7 @@ int main() {
         last_frame = this_frame;
         this_frame = glfwGetTime();
         double fps = 1.0 / (this_frame - last_frame);
-        best_fps = std::max(fps, best_fps);
+        best_fps   = std::max(fps, best_fps);
     }
 
 

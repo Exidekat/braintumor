@@ -268,4 +268,24 @@ namespace neuron {
     vk::PipelineCache Context::pipeline_cache() const {
         return m_pipeline_cache;
     }
+
+    CommandPool::CommandPool(const std::shared_ptr<Context> &context, uint32_t queue_family, bool resettable) : m_context(context) {
+        m_command_pool = m_context->device().createCommandPool({resettable ? vk::CommandPoolCreateFlagBits::eResetCommandBuffer : vk::CommandPoolCreateFlags{}, queue_family, });
+    }
+
+    CommandPool::~CommandPool() {
+        m_context->device().destroy(m_command_pool);
+    }
+
+    std::vector<vk::CommandBuffer> CommandPool::allocate_command_buffers(uint32_t count, vk::CommandBufferLevel level) const {
+        return m_context->device().allocateCommandBuffers(vk::CommandBufferAllocateInfo{m_command_pool, level, count});
+    }
+
+    vk::CommandBuffer CommandPool::allocate_command_buffer(vk::CommandBufferLevel level) const {
+        return m_context->device().allocateCommandBuffers(vk::CommandBufferAllocateInfo{m_command_pool, level, 1})[0];
+    }
+
+    void CommandPool::free_command_buffers(const std::vector<vk::CommandBuffer> &command_buffers) const {
+        m_context->device().freeCommandBuffers(m_command_pool, command_buffers);
+    }
 } // namespace neuron

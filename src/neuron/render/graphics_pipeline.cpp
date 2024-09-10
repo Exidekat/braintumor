@@ -219,6 +219,21 @@ namespace neuron::render {
         return *this;
     }
 
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_standard_blend_attachment() {
+        color_blend_attachments.push_back(vk::PipelineColorBlendAttachmentState{
+            true,
+            vk::BlendFactor::eSrcAlpha,
+            vk::BlendFactor::eOneMinusSrcAlpha,
+            vk::BlendOp::eAdd,
+            vk::BlendFactor::eOne,
+            vk::BlendFactor::eZero,
+            vk::BlendOp::eAdd,
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+        });
+
+        return *this;
+    }
+
     GraphicsPipeline::GraphicsPipeline(const std::shared_ptr<Context> &context, const GraphicsPipelineBuilder &builder) : m_context(context) {
         std::vector<vk::PipelineShaderStageCreateInfo> stages;
 
@@ -331,7 +346,8 @@ namespace neuron::render {
 
         pipeline_create_info.pNext = &pipeline_rendering;
 
-        m_pipeline = m_context->device().createGraphicsPipeline(m_context->pipeline_cache(), pipeline_create_info).value; // TODO: do something sort of checking on the actual result.
+        m_pipeline =
+            m_context->device().createGraphicsPipeline(m_context->pipeline_cache(), pipeline_create_info).value; // TODO: do something sort of checking on the actual result.
     }
 
     GraphicsPipeline::~GraphicsPipeline() {

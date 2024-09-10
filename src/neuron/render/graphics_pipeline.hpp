@@ -6,6 +6,8 @@
 
 #include <filesystem>
 
+#include <glm/glm.hpp>
+
 namespace neuron::render {
 
     enum class ShaderModuleSourceType { SPIRV, GLSL };
@@ -107,8 +109,8 @@ namespace neuron::render {
         int32_t      base_pipeline_index = -1;
 
         std::vector<vk::Format> color_attachment_formats;
-        vk::Format depth_format;
-        vk::Format stencil_format;
+        vk::Format              depth_format;
+        vk::Format              stencil_format;
 
 
         GraphicsPipelineBuilder &add_shader(const ShaderStageDefinition &def);
@@ -119,6 +121,8 @@ namespace neuron::render {
         GraphicsPipelineBuilder &add_dynamic_state(vk::DynamicState state);
         GraphicsPipelineBuilder &add_vertex_binding(uint32_t binding, uint32_t stride, vk::VertexInputRate input_rate = vk::VertexInputRate::eVertex);
         GraphicsPipelineBuilder &add_vertex_attribute(uint32_t binding, uint32_t location, vk::Format format, uint32_t offset);
+        GraphicsPipelineBuilder &add_standard_blend_attachment();
+        GraphicsPipelineBuilder &add_viewport(const glm::fvec2& )
     };
 
     class NEURON_API GraphicsPipeline {
