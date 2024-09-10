@@ -15,12 +15,13 @@ namespace neuron::render {
             throw std::runtime_error("Failed to open file");
         }
 
-        auto  file_size = file.tellg();
-        auto *buffer    = new char[file_size];
+        auto  file_size = static_cast<std::streamsize>(file.tellg());
+        auto *buffer    = new char[file_size + 1];
+        memset(buffer, 0, file_size + 1);
         file.seekg(0);
         file.read(buffer, file_size);
         file.close();
-        std::string content(buffer, file_size);
+        std::string content(buffer, strlen(buffer));
         delete[] buffer;
         return content;
     }
@@ -93,7 +94,7 @@ namespace neuron::render {
 
 
         shaderc::Compiler compiler;
-        auto              res = compiler.CompileGlslToSpv(glsl, kind, "");
+        auto              res = compiler.CompileGlslToSpv(glsl, kind, "shader.glsl");
 
         if (res.GetNumErrors() != 0) {
             std::cerr << "Shader Compilation Error: " << res.GetErrorMessage() << std::endl;
