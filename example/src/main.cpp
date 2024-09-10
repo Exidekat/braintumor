@@ -11,7 +11,7 @@
 int main() {
     std::cout << "Running Neuron version: " << neuron::get_version() << std::endl;
 
-    auto ctx = std::make_shared<neuron::Context>(neuron::ContextSettings{
+    auto ctx = neuron::Context::create(neuron::ContextSettings{
         .application_name = "neuron-example", .application_version = neuron::Version{0, 1, 0}, .enable_api_validation = true,
         // .enable_api_dump       = true,
     });
@@ -39,12 +39,29 @@ int main() {
                                  .add_color_attachment_with_standard_blend(display_system->display_target_config().format)
                                  .set_depth_attachment_format(vk::Format::eD24UnormS8Uint)
                                  .set_stencil_attachment_format(vk::Format::eD24UnormS8Uint)
+                                 .add_vertex_binding(0, 8 * sizeof(float))
+                                 .add_vertex_attribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0)
+                                 .add_vertex_attribute(0, 1, vk::Format::eR32G32B32A32Sfloat, 4 * sizeof(float))
                                  .build(ctx);
 
     double last_frame = -std::numeric_limits<double>::infinity();
     double this_frame = glfwGetTime();
 
     double best_fps = 0.0f;
+
+    std::vector<glm::vec4> vertices = {
+        {0.0f, -0.5f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {-0.5f, 0.5f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f},
+    };
+
+    // auto buffer = ctx->allocate_buffer(vk::BufferCreateInfo({}, sizeof(glm::vec4) * vertices.size(), vk::BufferUsageFlagBits::eVertexBuffer),
+    //                                    VmaAllocationCreateInfo{.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, .usage = VMA_MEMORY_USAGE_AUTO});
+
+    auto buffer = ctx->allocate_static_gpu_buffer(vertices, vk::BufferUsageFlagBits::eVertexBuffer);
+
+    // void* mem;
+    // auto _ = vmaMapMemory(ctx->allocator(), buffer.allocation, &mem);
+    // std::memcpy(mem, vertices.data(), sizeof(glm::vec4) * vertices.size());
+    // vmaUnmapMemory(ctx->allocator(), buffer.allocation);
 
     while (window->is_open()) {
         neuron::os::Window::poll_events();
@@ -69,6 +86,8 @@ int main() {
             const auto time = static_cast<float>(glfwGetTime());
 
             cmd.pushConstants(pipeline_layout->pipeline_layout(), vk::ShaderStageFlagBits::eVertex, 0, 4, &time);
+
+            cmd.bindVertexBuffers(0, buffer.resource, {0});
 
             cmd.draw(3, 1, 0, 0);
 
@@ -103,6 +122,8 @@ int main() {
 
 
     ctx->device().waitIdle();
+
+    ctx->free_buffer(buffer);
 
     std::cout << "Best FPS: " << best_fps << std::endl;
 }

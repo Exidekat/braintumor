@@ -10,6 +10,8 @@
 #include <unordered_set>
 #include <variant>
 
+#include <vk_mem_alloc.h>
+
 namespace neuron {
     std::string NEURON_API get_version();
 
@@ -64,9 +66,24 @@ namespace neuron {
         void                *user_data;
     };
 
+    template <typename T>
+    struct VmaAllocated {
+        T                 resource;
+        VmaAllocation     allocation;
+        VmaAllocationInfo allocation_info;
+    };
+
+    class CommandPool;
+
     class NEURON_API Context final {
-      public:
         explicit Context(const ContextSettings &settings);
+      public:
+
+        static inline std::shared_ptr<Context> create(const ContextSettings& settings) {
+            auto ctx = std::shared_ptr<Context>(new Context(settings));
+            ctx->setup(ctx);
+            return ctx;
+        };
 
         ~Context();
 
@@ -81,8 +98,45 @@ namespace neuron {
         [[nodiscard]] vk::Queue                                 compute_queue() const;
         [[nodiscard]] uint32_t                                  compute_queue_family() const;
         [[nodiscard]] vk::PipelineCache                         pipeline_cache() const;
+        [[nodiscard]] VmaAllocator                              allocator() const;
+
+        [[nodiscard]] VmaAllocated<vk::Image>  allocate_image(const vk::ImageCreateInfo &ici, const VmaAllocationCreateInfo &allocation_create_info) const;
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_buffer(const vk::BufferCreateInfo &bci, const VmaAllocationCreateInfo &allocation_create_info) const;
+
+        void free_image(const VmaAllocated<vk::Image> &image) const;
+        void free_buffer(const VmaAllocated<vk::Buffer> &buffer) const;
+
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_static_gpu_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const;
+
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_staging_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const;
+
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_host_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const;
+
+        [[nodiscard]] void *map_buffer(const VmaAllocated<vk::Buffer> &buffer) const;
+        void                unmap_buffer(const VmaAllocated<vk::Buffer> &buffer) const;
+
+        void copy_buffer_to_buffer(const VmaAllocated<vk::Buffer> &src, const VmaAllocated<vk::Buffer> &dst, vk::DeviceSize size, vk::DeviceSize src_offset, vk::DeviceSize dst_offset) const;
+
+
+        template<typename T>
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_static_gpu_buffer(const std::vector<T>& v, vk::BufferUsageFlags usage) const {
+            return  allocate_static_gpu_buffer(v.size() * sizeof(T), v.data(), usage);
+        };
+
+        template<typename T>
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_staging_buffer(const std::vector<T>& v, vk::BufferUsageFlags usage) const {
+            return  allocate_staging_buffer(v.size() * sizeof(T), v.data(), usage);
+        };
+
+        template<typename T>
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_host_buffer(const std::vector<T>& v, vk::BufferUsageFlags usage) const {
+            return  allocate_host_buffer(v.size() * sizeof(T), v.data(), usage);
+        };
 
       private:
+
+        void setup(const std::shared_ptr<Context>& me);
+
         vk::Instance                              m_instance;
         std::optional<vk::DebugUtilsMessengerEXT> m_debug_messenger;
         vk::PhysicalDevice                        m_physical_device;
@@ -100,21 +154,27 @@ namespace neuron {
         DebugUserData     *m_debug_user_data = nullptr;
 
         vk::PipelineCache m_pipeline_cache = VK_NULL_HANDLE;
+
+        VmaAllocator m_allocator;
+
+        std::shared_ptr<CommandPool> m_main_pool;
+        std::shared_ptr<CommandPool> m_transfer_pool;
+        std::shared_ptr<CommandPool> m_compute_pool;
     };
 
     class NEURON_API CommandPool {
       public:
-        CommandPool(const std::shared_ptr<Context> &context, uint32_t queue_family, bool resettable = false);
+         CommandPool(const std::shared_ptr<Context> &context, uint32_t queue_family, bool resettable = false);
         ~CommandPool();
 
         [[nodiscard]] std::vector<vk::CommandBuffer> allocate_command_buffers(uint32_t count, vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) const;
-        [[nodiscard]] vk::CommandBuffer allocate_command_buffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) const;
+        [[nodiscard]] vk::CommandBuffer              allocate_command_buffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) const;
 
         void free_command_buffers(const std::vector<vk::CommandBuffer> &command_buffers) const;
-      private:
 
+      private:
         std::shared_ptr<Context> m_context;
-        vk::CommandPool m_command_pool;
+        vk::CommandPool          m_command_pool;
     };
 
 } // namespace neuron

@@ -1,8 +1,11 @@
+#define VMA_IMPLEMENTATION
+
 #include "neuron.hpp"
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 
@@ -163,14 +166,45 @@ namespace neuron {
 
         // TODO: non-naive queue family selection
 
-        m_main_queue_family     = 0;
-        m_transfer_queue_family = 0;
-        m_compute_queue_family  = 0;
+        std::optional<uint32_t> mqf;
+        std::optional<uint32_t> tqf;
+        std::optional<uint32_t> cqf;
+
+        auto     queue_family_properties = m_physical_device.getQueueFamilyProperties();
+        uint32_t qi                      = 0;
+        for (const auto &qfp : queue_family_properties) {
+            if (!mqf.has_value() && qfp.queueFlags & vk::QueueFlagBits::eGraphics && glfwGetPhysicalDevicePresentationSupport(m_instance, m_physical_device, qi)) {
+                mqf = qi;
+            }
+
+            if (!tqf.has_value() && qfp.queueFlags & vk::QueueFlagBits::eTransfer && !(qfp.queueFlags & vk::QueueFlagBits::eGraphics) &&
+                !(qfp.queueFlags & vk::QueueFlagBits::eCompute)) {
+                tqf = qi;
+            }
+
+            if (!cqf.has_value() && qfp.queueFlags & vk::QueueFlagBits::eCompute && !(qfp.queueFlags & vk::QueueFlagBits::eGraphics)) {
+                cqf = qi;
+            }
+
+            qi++;
+        }
+
+        m_main_queue_family     = mqf.value();
+        m_transfer_queue_family = tqf.value_or(m_main_queue_family);
+        m_compute_queue_family  = cqf.value_or(m_main_queue_family);
 
         std::array<float, 1> queue_priorities = {1.0f};
 
         std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
         queue_create_infos.emplace_back(vk::DeviceQueueCreateFlags{}, m_main_queue_family, queue_priorities);
+
+        if (m_transfer_queue_family != m_main_queue_family) {
+            queue_create_infos.emplace_back(vk::DeviceQueueCreateFlags{}, m_transfer_queue_family, queue_priorities);
+        }
+
+        if (m_compute_queue_family != m_main_queue_family) {
+            queue_create_infos.emplace_back(vk::DeviceQueueCreateFlags{}, m_compute_queue_family, queue_priorities);
+        }
 
         std::unordered_set<std::string> device_extensions_set(settings.extra_device_extensions.begin(), settings.extra_device_extensions.end());
         device_extensions_set.insert(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -215,14 +249,14 @@ namespace neuron {
         // setup pipeline cache
 
         // TODO: use actual cache dir (do this when updating to use proper application folders)
-        void* pc_init_data = nullptr;
+        void  *pc_init_data      = nullptr;
         size_t pc_init_data_size = 0;
         if (std::filesystem::exists("pipeline_cache")) {
             std::ifstream f("pipeline_cache", std::ios::ate | std::ios::binary);
             pc_init_data_size = f.tellg();
-            pc_init_data = malloc(pc_init_data_size);
+            pc_init_data      = malloc(pc_init_data_size);
             f.seekg(0);
-            f.read(static_cast<char*>(pc_init_data), pc_init_data_size);
+            f.read(static_cast<char *>(pc_init_data), pc_init_data_size);
             f.close();
         }
 
@@ -231,24 +265,39 @@ namespace neuron {
         if (pc_init_data) {
             free(pc_init_data);
         }
+
+        VmaAllocatorCreateInfo aci{};
+        aci.device         = m_device;
+        aci.instance       = m_instance;
+        aci.physicalDevice = m_physical_device;
+
+        vmaCreateAllocator(&aci, &m_allocator);
     }
 
     Context::~Context() {
+        m_main_pool.reset();
+        m_transfer_pool.reset();
+        m_compute_pool.reset();
+
         if (m_instance) {
             if (m_device)
-                if (m_pipeline_cache) {
-                    auto data = m_device.getPipelineCacheData(m_pipeline_cache);
-                    {
-                        std::ofstream f("pipeline_cache", std::ios::binary | std::ios::out);
-                        f.write(reinterpret_cast<const char *>(data.data()), data.size());
-
-                        f.close();
-                    }
-
-                    m_device.destroy(m_pipeline_cache);
+                if (m_allocator) {
+                    vmaDestroyAllocator(m_allocator);
                 }
 
-                m_device.destroy();
+            if (m_pipeline_cache) {
+                auto data = m_device.getPipelineCacheData(m_pipeline_cache);
+                {
+                    std::ofstream f("pipeline_cache", std::ios::binary | std::ios::out);
+                    f.write(reinterpret_cast<const char *>(data.data()), data.size());
+
+                    f.close();
+                }
+
+                m_device.destroy(m_pipeline_cache);
+            }
+
+            m_device.destroy();
 
             if (m_debug_messenger.has_value()) {
                 m_instance.destroy(m_debug_messenger.value());
@@ -304,8 +353,119 @@ namespace neuron {
         return m_pipeline_cache;
     }
 
+    VmaAllocator Context::allocator() const {
+        return m_allocator;
+    }
+
+    VmaAllocated<vk::Image> Context::allocate_image(const vk::ImageCreateInfo &ici, const VmaAllocationCreateInfo &allocation_create_info) const {
+        VmaAllocated<vk::Image> res;
+
+        VkImage img;
+
+        VkImageCreateInfo ici_ = ici;
+        vmaCreateImage(m_allocator, &ici_, &allocation_create_info, &img, &res.allocation, &res.allocation_info);
+        res.resource = img;
+
+        return res;
+    }
+
+    VmaAllocated<vk::Buffer> Context::allocate_buffer(const vk::BufferCreateInfo &bci, const VmaAllocationCreateInfo &allocation_create_info) const {
+        VmaAllocated<vk::Buffer> res;
+
+        VkBuffer buf;
+
+        VkBufferCreateInfo bci_ = bci;
+
+        vmaCreateBuffer(m_allocator, &bci_, &allocation_create_info, &buf, &res.allocation, &res.allocation_info);
+        res.resource = buf;
+
+        return res;
+    }
+
+    void Context::free_image(const VmaAllocated<vk::Image> &image) const {
+        vmaDestroyImage(m_allocator, image.resource, image.allocation);
+    }
+
+    void Context::free_buffer(const VmaAllocated<vk::Buffer> &buffer) const {
+        vmaDestroyBuffer(m_allocator, buffer.resource, buffer.allocation);
+    }
+
+    VmaAllocated<vk::Buffer> Context::allocate_static_gpu_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const {
+        auto buf = allocate_buffer(vk::BufferCreateInfo{{}, size, usage | vk::BufferUsageFlagBits::eTransferDst}, VmaAllocationCreateInfo{{}, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE});
+
+        if (data) {
+            auto stage = allocate_staging_buffer(size, data, {});
+            copy_buffer_to_buffer(stage, buf, size, 0, 0);
+        }
+
+        return buf;
+    }
+
+    VmaAllocated<vk::Buffer> Context::allocate_staging_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const {
+        auto buf = allocate_buffer(vk::BufferCreateInfo{{}, size, usage | vk::BufferUsageFlagBits::eTransferSrc},
+                                   VmaAllocationCreateInfo{VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO});
+        if (data) {
+            void *p = map_buffer(buf);
+            std::memcpy(p, data, size);
+            unmap_buffer(buf);
+        }
+
+        return buf;
+    }
+
+    VmaAllocated<vk::Buffer> Context::allocate_host_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const {
+        auto buf = allocate_buffer(vk::BufferCreateInfo{{}, size, usage},
+                                   VmaAllocationCreateInfo{VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_HOST});
+        if (data) {
+            void *p = map_buffer(buf);
+            std::memcpy(p, data, size);
+            unmap_buffer(buf);
+        }
+
+        return buf;
+    }
+
+    void *Context::map_buffer(const VmaAllocated<vk::Buffer> &buffer) const {
+        void *p;
+        vmaMapMemory(m_allocator, buffer.allocation, &p);
+        return p;
+    }
+
+    void Context::unmap_buffer(const VmaAllocated<vk::Buffer> &buffer) const {
+        vmaUnmapMemory(m_allocator, buffer.allocation);
+    }
+
+    void Context::copy_buffer_to_buffer(const VmaAllocated<vk::Buffer> &src, const VmaAllocated<vk::Buffer> &dst, vk::DeviceSize size, vk::DeviceSize src_offset,
+                                        vk::DeviceSize dst_offset) const {
+        vk::Fence         fence = m_device.createFence({});
+        vk::CommandBuffer cmd   = m_transfer_pool->allocate_command_buffer();
+
+        vk::BufferCopy copy{src_offset, dst_offset, size};
+
+        cmd.begin(vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+        cmd.copyBuffer(src.resource, dst.resource, copy);
+        cmd.end();
+
+        vk::SubmitInfo si{};
+        si.setCommandBuffers(cmd);
+        m_transfer_queue.submit(si, fence);
+        auto _ = m_device.waitForFences(fence, true, UINT64_MAX);
+
+        m_transfer_pool->free_command_buffers({cmd});
+        m_device.destroy(fence);
+    }
+
+    void Context::setup(const std::shared_ptr<Context> &me) {
+        m_main_pool = std::make_shared<CommandPool>(me, m_main_queue_family);
+        m_transfer_pool = std::make_shared<CommandPool>(me, m_transfer_queue_family);
+        m_compute_pool = std::make_shared<CommandPool>(me, m_compute_queue_family);
+    }
+
     CommandPool::CommandPool(const std::shared_ptr<Context> &context, uint32_t queue_family, bool resettable) : m_context(context) {
-        m_command_pool = m_context->device().createCommandPool({resettable ? vk::CommandPoolCreateFlagBits::eResetCommandBuffer : vk::CommandPoolCreateFlags{}, queue_family, });
+        m_command_pool = m_context->device().createCommandPool({
+            resettable ? vk::CommandPoolCreateFlagBits::eResetCommandBuffer : vk::CommandPoolCreateFlags{},
+            queue_family,
+        });
     }
 
     CommandPool::~CommandPool() {
