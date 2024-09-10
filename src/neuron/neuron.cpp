@@ -264,4 +264,8 @@ namespace neuron {
     uint32_t Context::compute_queue_family() const {
         return m_compute_queue_family;
     }
+
+    vk::PipelineCache Context::pipeline_cache() const {
+        return m_pipeline_cache;
+    }
 } // namespace neuron

@@ -85,6 +85,8 @@ add_library(neuron src/neuron/neuron.cpp src/neuron/neuron.hpp
         src/neuron/render/simple_render_pass.hpp
         src/neuron/render/graphics_pipeline.cpp
         src/neuron/render/graphics_pipeline.hpp
+        src/neuron/render/pipeline_layout.cpp
+        src/neuron/render/pipeline_layout.hpp
 )
 target_include_directories(neuron PUBLIC src/)
 target_link_libraries(neuron PUBLIC Vulkan::Vulkan Vulkan::shaderc glfw)
@@ -107,4 +109,5 @@ file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/run)
 
 add_custom_target(run_prep
     COMMAND ${CMAKE_COMMAND} -E copy -t ${CMAKE_SOURCE_DIR}/run $<TARGET_RUNTIME_DLLS:example> $<TARGET_FILE:example>
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/res/ ${CMAKE_SOURCE_DIR}/run/res
     COMMAND_EXPAND_LISTS)

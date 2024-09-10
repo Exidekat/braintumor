@@ -18,3 +18,5 @@ _deps/
 
 .ninja_log
 .ninja_deps
+
+run/

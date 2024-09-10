@@ -107,27 +107,27 @@ namespace neuron::render {
     vk::ShaderStageFlagBits infer_stage_from_path(const std::filesystem::path &path) {
         auto ext = path.extension().string();
 
-        if (ext == "vert") {
+        if (ext == ".vert") {
             return vk::ShaderStageFlagBits::eVertex;
         }
 
-        if (ext == "frag") {
+        if (ext == ".frag") {
             return vk::ShaderStageFlagBits::eFragment;
         }
 
-        if (ext == "geom") {
+        if (ext == ".geom") {
             return vk::ShaderStageFlagBits::eGeometry;
         }
 
-        if (ext == "tesc") {
+        if (ext == ".tesc") {
             return vk::ShaderStageFlagBits::eTessellationControl;
         }
 
-        if (ext == "tese") {
+        if (ext == ".tese") {
             return vk::ShaderStageFlagBits::eTessellationEvaluation;
         }
 
-        if (ext == "comp") {
+        if (ext == ".comp") {
             return vk::ShaderStageFlagBits::eCompute;
         }
 
@@ -172,6 +172,52 @@ namespace neuron::render {
         m_context->device().destroyShaderModule(m_module);
     }
 
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_shader(const ShaderStageDefinition &def) {
+        shader_stages.push_back(def);
+
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_shader(vk::ShaderStageFlagBits stage, const ShaderModuleInfo &module) {
+        shader_stages.push_back(ShaderStageDefinition{module, stage});
+
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_shader(ShaderModuleSourceType source_type, vk::ShaderStageFlagBits stage, const ShaderModuleCodeSource &source) {
+        shader_stages.push_back(ShaderStageDefinition{.module = ShaderModuleInfo{.source = source, .type = source_type, .stage = stage}, .stage = stage});
+
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_glsl_shader(const std::filesystem::path &path) {
+        const vk::ShaderStageFlagBits stage = infer_stage_from_path(path);
+
+        shader_stages.push_back(ShaderStageDefinition{.module = ShaderModuleInfo{.source = path, .type = ShaderModuleSourceType::GLSL, .stage = stage}, .stage = stage});
+
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_blend_attachment(const vk::PipelineColorBlendAttachmentState &blend_attachment) {
+        color_blend_attachments.push_back(blend_attachment);
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_dynamic_state(const vk::DynamicState state) {
+        dynamic_states.insert(state);
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_vertex_binding(uint32_t binding, uint32_t stride, vk::VertexInputRate input_rate) {
+        vertex_bindings.emplace_back(binding, stride, input_rate);
+        return *this;
+    }
+
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::add_vertex_attribute(uint32_t binding, uint32_t location, vk::Format format, uint32_t offset) {
+        vertex_attributes.emplace_back(location, binding, format, offset);
+        return *this;
+    }
+
     GraphicsPipeline::GraphicsPipeline(const std::shared_ptr<Context> &context, const GraphicsPipelineBuilder &builder) : m_context(context) {
         std::vector<vk::PipelineShaderStageCreateInfo> stages;
 
@@ -195,8 +241,91 @@ namespace neuron::render {
             }
         }
 
-        
+        std::vector<vk::DynamicState> dynamic_states(builder.dynamic_states.begin(), builder.dynamic_states.end());
+
+        vk::PipelineDynamicStateCreateInfo dynamic_state{};
+        dynamic_state.setDynamicStates(dynamic_states);
+
+
+        vk::PipelineVertexInputStateCreateInfo vertex_input_state{};
+        vertex_input_state.setVertexAttributeDescriptions(builder.vertex_attributes);
+        vertex_input_state.setVertexBindingDescriptions(builder.vertex_bindings);
+
+
+        vk::PipelineInputAssemblyStateCreateInfo input_assembly_state{};
+        input_assembly_state.setTopology(builder.primitive_topology);
+        input_assembly_state.setPrimitiveRestartEnable(builder.enable_primitive_restart);
+
+
+        vk::PipelineTessellationStateCreateInfo tessellation_state{};
+        tessellation_state.setPatchControlPoints(builder.patch_control_points);
+
+
+        vk::PipelineViewportStateCreateInfo viewport_state{};
+        viewport_state.setViewports(builder.viewports);
+        viewport_state.setScissors(builder.scissors); // TODO: adders for these two in the builder struct
+
+
+        vk::PipelineRasterizationStateCreateInfo rasterization_state{};
+        rasterization_state.setDepthClampEnable(builder.enable_depth_clamp);
+        rasterization_state.setRasterizerDiscardEnable(builder.enable_rasterizer_discard);
+        rasterization_state.setPolygonMode(builder.polygon_mode);
+        rasterization_state.setCullMode(builder.cull_mode);
+        rasterization_state.setFrontFace(builder.front_face);
+        rasterization_state.setDepthBiasEnable(builder.enable_depth_bias);
+        rasterization_state.setDepthBiasConstantFactor(builder.depth_bias_constant_factor);
+        rasterization_state.setDepthBiasClamp(builder.depth_bias_clamp);
+        rasterization_state.setDepthBiasSlopeFactor(builder.depth_bias_slope_factor);
+        rasterization_state.setLineWidth(builder.line_width);
+
+
+        vk::PipelineMultisampleStateCreateInfo multisample_state{};
+        multisample_state.setRasterizationSamples(builder.rasterization_samples);
+        multisample_state.setSampleShadingEnable(builder.enable_sample_shading);
+        multisample_state.setMinSampleShading(builder.min_sample_shading);
+        multisample_state.setPSampleMask(builder.sample_mask.empty() ? nullptr : builder.sample_mask.data());
+        multisample_state.setAlphaToCoverageEnable(builder.enable_alpha_to_coverage);
+        multisample_state.setAlphaToOneEnable(builder.enable_alpha_to_one);
+
+
+        vk::PipelineDepthStencilStateCreateInfo depth_stencil_state{};
+        depth_stencil_state.setDepthTestEnable(builder.enable_depth_test);
+        depth_stencil_state.setDepthWriteEnable(builder.enable_depth_write);
+        depth_stencil_state.setDepthCompareOp(builder.depth_compare_op);
+        depth_stencil_state.setDepthBoundsTestEnable(builder.enable_depth_bounds_test);
+        depth_stencil_state.setStencilTestEnable(builder.enable_stencil_test);
+        depth_stencil_state.setFront(builder.stencil_front);
+        depth_stencil_state.setBack(builder.stencil_back);
+        depth_stencil_state.setMinDepthBounds(builder.min_depth_bounds);
+        depth_stencil_state.setMaxDepthBounds(builder.max_depth_bounds);
+
+        vk::PipelineColorBlendStateCreateInfo color_blend_state{};
+        color_blend_state.setLogicOpEnable(builder.enable_logic_op);
+        color_blend_state.setLogicOp(builder.logic_op);
+        color_blend_state.setAttachments(builder.color_blend_attachments);
+        color_blend_state.setBlendConstants(builder.blend_constants);
+
+        vk::GraphicsPipelineCreateInfo pipeline_create_info = {};
+        pipeline_create_info.setStages(stages);
+        pipeline_create_info.setPVertexInputState(&vertex_input_state);
+        pipeline_create_info.setPInputAssemblyState(&input_assembly_state);
+        pipeline_create_info.setPTessellationState(&tessellation_state);
+        pipeline_create_info.setPViewportState(&viewport_state);
+        pipeline_create_info.setPRasterizationState(&rasterization_state);
+        pipeline_create_info.setPMultisampleState(&multisample_state);
+        pipeline_create_info.setPDepthStencilState(&depth_stencil_state);
+        pipeline_create_info.setPColorBlendState(&color_blend_state);
+        pipeline_create_info.setPDynamicState(&dynamic_state);
+        pipeline_create_info.setLayout(builder.layout->pipeline_layout());
+        pipeline_create_info.setRenderPass(builder.render_pass);
+        pipeline_create_info.setSubpass(builder.subpass);
+        pipeline_create_info.setBasePipelineHandle(builder.base_pipeline);
+        pipeline_create_info.setBasePipelineIndex(builder.base_pipeline_index);
+
+        m_pipeline = m_context->device().createGraphicsPipeline(m_context->pipeline_cache(), pipeline_create_info).value; // TODO: do something sort of checking on the actual result.
     }
 
-    GraphicsPipeline::~GraphicsPipeline() {}
+    GraphicsPipeline::~GraphicsPipeline() {
+        m_context->device().destroyPipeline(m_pipeline);
+    }
 } // namespace neuron::render

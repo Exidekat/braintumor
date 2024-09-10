@@ -79,6 +79,7 @@ namespace neuron {
         [[nodiscard]] uint32_t                                  transfer_queue_family() const;
         [[nodiscard]] vk::Queue                                 compute_queue() const;
         [[nodiscard]] uint32_t                                  compute_queue_family() const;
+        [[nodiscard]] vk::PipelineCache                         pipeline_cache() const;
 
       private:
         vk::Instance                              m_instance;
@@ -96,6 +97,8 @@ namespace neuron {
 
         OptionalFeatureSet m_optional_features;
         DebugUserData     *m_debug_user_data = nullptr;
+
+        vk::PipelineCache m_pipeline_cache = VK_NULL_HANDLE;
     };
 
 } // namespace neuron

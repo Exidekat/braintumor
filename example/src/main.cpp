@@ -1,6 +1,7 @@
 #include "neuron/neuron.hpp"
 #include "neuron/os/window.hpp"
 #include "neuron/render/display_system.hpp"
+#include "neuron/render/graphics_pipeline.hpp"
 #include "neuron/render/simple_render_pass.hpp"
 
 
@@ -23,6 +24,31 @@ int main() {
     std::vector<vk::CommandBuffer> command_buffers = ctx->device().allocateCommandBuffers(
         vk::CommandBufferAllocateInfo(command_pool, vk::CommandBufferLevel::ePrimary, neuron::render::DisplaySystem::MAX_FRAMES_IN_FLIGHT));
 
+    auto pipeline_layout = std::make_shared<neuron::render::PipelineLayout>(ctx);
+
+    auto graphics_pipeline_builder = neuron::render::GraphicsPipelineBuilder{.layout = pipeline_layout};
+    graphics_pipeline_builder.add_glsl_shader("res/shaders/main.vert").add_glsl_shader("res/shaders/main.frag");
+    graphics_pipeline_builder.add_blend_attachment(vk::PipelineColorBlendAttachmentState{
+        true,
+        vk::BlendFactor::eSrcAlpha,
+        vk::BlendFactor::eOneMinusSrcAlpha,
+        vk::BlendOp::eAdd,
+        vk::BlendFactor::eOne,
+        vk::BlendFactor::eZero,
+        vk::BlendOp::eAdd,
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+    });
+
+    vk::Extent2D we = window->get_extent();
+
+    graphics_pipeline_builder.viewports.emplace_back(0.0f, 0.0f, static_cast<float>(we.width), static_cast<float>(we.height), 0.0f, 100.0f);
+    graphics_pipeline_builder.scissors.emplace_back(vk::Offset2D{0, 0}, we);
+
+    graphics_pipeline_builder.add_dynamic_state(vk::DynamicState::eViewport);
+    graphics_pipeline_builder.add_dynamic_state(vk::DynamicState::eScissor);
+
+    std::shared_ptr<neuron::render::GraphicsPipeline> graphics_pipeline = std::make_shared<neuron::render::GraphicsPipeline>(ctx, graphics_pipeline_builder);
+
     while (window->is_open()) {
         neuron::os::Window::poll_events();
 
@@ -37,7 +63,11 @@ int main() {
         neuron::render::SimpleRenderPassInfo pass_info{frame_info.image, frame_info.image_view, render_area, {0.0f, 1.0f, 0.0f, 1.0f}, true};
 
         neuron::render::simple_render_pass(cmd, pass_info, [&](const vk::CommandBuffer &cmd) {
+            cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, graphics_pipeline->pipeline());
+            cmd.setViewport(0, vk::Viewport{0.0f, 0.0f, static_cast<float>(render_area.extent.width), static_cast<float>(render_area.extent.height), 0.0f, 100.0f});
+            cmd.setScissor(0, render_area);
 
+            cmd.draw(3, 1, 0, 0);
         });
 
         cmd.end();
