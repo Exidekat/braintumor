@@ -106,7 +106,7 @@ namespace neuron {
         void free_image(const VmaAllocated<vk::Image> &image) const;
         void free_buffer(const VmaAllocated<vk::Buffer> &buffer) const;
 
-        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_static_gpu_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const;
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_gpu_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const;
 
         [[nodiscard]] VmaAllocated<vk::Buffer> allocate_staging_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const;
 
@@ -119,8 +119,8 @@ namespace neuron {
 
 
         template<typename T>
-        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_static_gpu_buffer(const std::vector<T>& v, vk::BufferUsageFlags usage) const {
-            return  allocate_static_gpu_buffer(v.size() * sizeof(T), v.data(), usage);
+        [[nodiscard]] VmaAllocated<vk::Buffer> allocate_gpu_buffer(const std::vector<T>& v, vk::BufferUsageFlags usage) const {
+            return  allocate_gpu_buffer(v.size() * sizeof(T), v.data(), usage);
         };
 
         template<typename T>
@@ -132,6 +132,8 @@ namespace neuron {
         [[nodiscard]] VmaAllocated<vk::Buffer> allocate_host_buffer(const std::vector<T>& v, vk::BufferUsageFlags usage) const {
             return  allocate_host_buffer(v.size() * sizeof(T), v.data(), usage);
         };
+
+        [[nodiscard]] VmaAllocated<vk::Image> allocate_gpu_image(const void* data, const vk::Extent2D& extent, vk::Format format) const;
 
       private:
 

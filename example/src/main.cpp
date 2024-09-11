@@ -53,15 +53,8 @@ int main() {
         {0.0f, -0.5f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {-0.5f, 0.5f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f},
     };
 
-    // auto buffer = ctx->allocate_buffer(vk::BufferCreateInfo({}, sizeof(glm::vec4) * vertices.size(), vk::BufferUsageFlagBits::eVertexBuffer),
-    //                                    VmaAllocationCreateInfo{.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, .usage = VMA_MEMORY_USAGE_AUTO});
+    auto buffer = ctx->allocate_gpu_buffer(vertices, vk::BufferUsageFlagBits::eVertexBuffer);
 
-    auto buffer = ctx->allocate_static_gpu_buffer(vertices, vk::BufferUsageFlagBits::eVertexBuffer);
-
-    // void* mem;
-    // auto _ = vmaMapMemory(ctx->allocator(), buffer.allocation, &mem);
-    // std::memcpy(mem, vertices.data(), sizeof(glm::vec4) * vertices.size());
-    // vmaUnmapMemory(ctx->allocator(), buffer.allocation);
 
     while (window->is_open()) {
         neuron::os::Window::poll_events();

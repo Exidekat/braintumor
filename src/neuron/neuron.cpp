@@ -390,7 +390,7 @@ namespace neuron {
         vmaDestroyBuffer(m_allocator, buffer.resource, buffer.allocation);
     }
 
-    VmaAllocated<vk::Buffer> Context::allocate_static_gpu_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const {
+    VmaAllocated<vk::Buffer> Context::allocate_gpu_buffer(size_t size, const void *data, vk::BufferUsageFlags usage) const {
         auto buf = allocate_buffer(vk::BufferCreateInfo{{}, size, usage | vk::BufferUsageFlagBits::eTransferDst}, VmaAllocationCreateInfo{{}, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE});
 
         if (data) {
