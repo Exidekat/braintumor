@@ -29,7 +29,7 @@ int main() {
 
     auto pipeline_layout = neuron::render::PipelineLayoutBuilder().add_push_constant_range(vk::ShaderStageFlagBits::eVertex, 0, 4).build(ctx);
 
-    auto graphics_pipeline = neuron::render::GraphicsPipelineBuilder(pipeline_layout)
+    auto graphics_pipeline_b = neuron::render::GraphicsPipelineBuilder(pipeline_layout)
                                  .add_glsl_shader("res/shaders/main.vert")
                                  .add_glsl_shader("res/shaders/main.frag")
                                  .add_viewport({0.0f, 0.0f}, original_extent, 0.0f, 1.0f)
@@ -41,8 +41,9 @@ int main() {
                                  .set_stencil_attachment_format(vk::Format::eD24UnormS8Uint)
                                  .add_vertex_binding(0, 8 * sizeof(float))
                                  .add_vertex_attribute(0, 0, vk::Format::eR32G32B32A32Sfloat, 0)
-                                 .add_vertex_attribute(0, 1, vk::Format::eR32G32B32A32Sfloat, 4 * sizeof(float))
-                                 .build(ctx);
+                                 .add_vertex_attribute(0, 1, vk::Format::eR32G32B32A32Sfloat, 4 * sizeof(float));
+    graphics_pipeline_b.cull_mode = vk::CullModeFlagBits::eNone;
+    auto graphics_pipeline = graphics_pipeline_b.build(ctx);
 
     double last_frame = -std::numeric_limits<double>::infinity();
     double this_frame = glfwGetTime();
