@@ -52,6 +52,9 @@ namespace neuron {
             instance_extensions_set.insert(required_extensions[i]);
         }
 
+        // Add VK_KHR_portability_enumeration extension to the set of instance extensions
+        instance_extensions_set.insert(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+
         std::unordered_set<std::string> layers_set(settings.extra_layers.begin(), settings.extra_layers.end());
 
         if (settings.enable_api_validation) {
@@ -78,6 +81,9 @@ namespace neuron {
         instance_create_info.setPApplicationInfo(&app_info);
         instance_create_info.setPEnabledExtensionNames(instance_extensions);
         instance_create_info.setPEnabledLayerNames(layers);
+
+        // Set VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR flag
+        instance_create_info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
 
         vk::DebugUtilsMessengerCreateInfoEXT messenger_create_info{};
 

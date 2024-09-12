@@ -54,7 +54,7 @@ elseif(APPLE)
 
     option(USE_STATIC_SHADERC "Use static linking for shaderc" OFF)
 
-elseif(UNIX AND NOT APPLE)
+else()
     # Linux-specific Vulkan setup
     find_library(Vulkan_LIB NAMES vulkan HINTS "$ENV{VULKAN_SDK}/lib")
     find_path(Vulkan_INCLUDE_DIR NAMES vulkan/vulkan.h HINTS "$ENV{VULKAN_SDK}/include")
@@ -131,7 +131,7 @@ target_compile_definitions(neuron PUBLIC
 
 add_library(neuron::neuron ALIAS neuron)
 
-# Option to switch between shared or static shaderc
+# Option to switch between shared or static shaderc for mac sufferers
 if(APPLE)
     if(USE_STATIC_SHADERC)
         message(STATUS "Using static shaderc library")
