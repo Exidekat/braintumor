@@ -34,8 +34,8 @@ if (WIN32)
 
 elseif(APPLE)
     # macOS-specific Vulkan setup
-    find_library(Vulkan_LIB NAMES vulkan HINTS "$ENV{VULKAN_SDK}/lib")
-    find_path(Vulkan_INCLUDE_DIR NAMES vulkan/vulkan.h HINTS "$ENV{VULKAN_SDK}/include")
+    find_library(Vulkan_LIB NAMES vulkan HINTS "/opt/homebrew/lib")
+    find_path(Vulkan_INCLUDE_DIR NAMES vulkan/vulkan.h HINTS "/opt/homebrew/include")
 
     if(Vulkan_LIB AND Vulkan_INCLUDE_DIR)
         message(STATUS "Found Vulkan library: ${Vulkan_LIB}")
@@ -44,8 +44,15 @@ elseif(APPLE)
         set_property(TARGET Vulkan::Vulkan PROPERTY IMPORTED_LOCATION "${Vulkan_LIB}")
         target_include_directories(Vulkan::Vulkan INTERFACE "${Vulkan_INCLUDE_DIR}")
     else()
-        message(FATAL_ERROR "Could not find Vulkan on macOS! Make sure VULKAN_SDK is set correctly.")
+        message(FATAL_ERROR "Could not find Vulkan on macOS! Make sure the Vulkan SDK is installed.")
     endif()
+
+    # Shaderc setup for macOS
+    set(SHADERC_INCLUDE_DIR "/opt/homebrew/opt/shaderc/include")
+    set(SHADERC_SHARED_LIBRARY "/opt/homebrew/opt/shaderc/lib/libshaderc_shared.dylib")
+    set(SHADERC_STATIC_LIBRARY "/opt/homebrew/opt/shaderc/lib/libshaderc.a")
+
+    option(USE_STATIC_SHADERC "Use static linking for shaderc" OFF)
 
 elseif(UNIX AND NOT APPLE)
     # Linux-specific Vulkan setup
@@ -91,7 +98,7 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glfw3 glm VulkanMemoryAllocator)
 
-# Define the neuron library
+# Define the neuron library FIRST
 add_library(neuron
     src/neuron/neuron.cpp src/neuron/neuron.hpp
     src/neuron/base.hpp
@@ -103,7 +110,7 @@ add_library(neuron
     src/neuron/render/pipeline_layout.cpp src/neuron/render/pipeline_layout.hpp
 )
 
-# Link libraries to the neuron target
+# After defining neuron, link libraries to the neuron target
 target_include_directories(neuron PUBLIC src/)
 target_link_libraries(neuron PUBLIC Vulkan::Vulkan glfw glm::glm GPUOpen::VulkanMemoryAllocator)
 
@@ -123,6 +130,17 @@ target_compile_definitions(neuron PUBLIC
 )
 
 add_library(neuron::neuron ALIAS neuron)
+
+# Option to switch between shared or static shaderc
+if(APPLE)
+    if(USE_STATIC_SHADERC)
+        message(STATUS "Using static shaderc library")
+        target_link_libraries(neuron PRIVATE ${SHADERC_STATIC_LIBRARY})
+    else()
+        message(STATUS "Using shared (dynamic) shaderc library")
+        target_link_libraries(neuron PRIVATE ${SHADERC_SHARED_LIBRARY})
+    endif()
+endif()
 
 # Add subdirectory for example
 add_subdirectory(example)
