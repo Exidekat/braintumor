@@ -21,3 +21,8 @@ _deps/
 
 run/
 build/
+
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.cmake
+Makefile
+cmake_install.cmake
