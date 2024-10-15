@@ -165,27 +165,43 @@ namespace neuron {
         std::vector<vk::PhysicalDevice> physical_devices = m_instance.enumeratePhysicalDevices();
 
         switch (settings.device_selection_strategy) {
-        case DeviceSelectionStrategy::Naive:
-            for (const auto &physical_device : physical_devices) {
-                vk::PhysicalDeviceProperties properties = physical_device.getProperties();
-                if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
-                    m_physical_device = physical_device;
-                    break;
+            case DeviceSelectionStrategy::Naive:
+                // Select an available discrete GPU
+                for (const auto &physical_device : physical_devices) {
+                    vk::PhysicalDeviceProperties properties = physical_device.getProperties();
+                    if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
+                        m_physical_device = physical_device;
+                        break;
+                    }
                 }
-            }
-            break;
-        case DeviceSelectionStrategy::FixedIndex: {
-            size_t index = std::get<FixedIndexStrategy>(settings.device_selection_strategy_impl).index;
-            if (index >= physical_devices.size()) {
-                throw std::runtime_error("Fixed physical device index out of range (GPU does not exist).");
-            }
-            m_physical_device = physical_devices[index];
-        } break;
-        case DeviceSelectionStrategy::CustomStrategy:
-            m_physical_device = std::get<CustomStrategy>(settings.device_selection_strategy_impl).selector(physical_devices);
-            break;
+                // If no discrete GPU found, try to find an integrated GPU
+                if (!m_physical_device) {
+                    for (const auto &physical_device : physical_devices) {
+                        vk::PhysicalDeviceProperties properties = physical_device.getProperties();
+                        if (properties.deviceType == vk::PhysicalDeviceType::eIntegratedGpu) {
+                            m_physical_device = physical_device;
+                            break;
+                        }
+                    }
+                }
+                // If still no GPU found, pick any available physical device
+                if (!m_physical_device && !physical_devices.empty()) {
+                    m_physical_device = physical_devices[0];
+                }
+                break;
+            case DeviceSelectionStrategy::FixedIndex: {
+                size_t index = std::get<FixedIndexStrategy>(settings.device_selection_strategy_impl).index;
+                if (index >= physical_devices.size()) {
+                    throw std::runtime_error("Fixed physical device index out of range (GPU does not exist).");
+                }
+                m_physical_device = physical_devices[index];
+            } break;
+            case DeviceSelectionStrategy::CustomStrategy:
+                m_physical_device = std::get<CustomStrategy>(settings.device_selection_strategy_impl).selector(physical_devices);
+                break;
         }
 
+        // If system failed to select a GPU, just give up and cry about it
         if (!m_physical_device) {
             throw std::runtime_error("Failed to select a valid physical device.");
         }
