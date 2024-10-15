@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-
+#include <memory>  // Required for enable_shared_from_this
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 
@@ -15,25 +15,41 @@ namespace neuron {
     }
 
     ContextSettings &ContextSettings::set_naive_device_selection() {
-        device_selection_strategy      = DeviceSelectionStrategy::Naive;
+        device_selection_strategy = DeviceSelectionStrategy::Naive;
         device_selection_strategy_impl = std::monostate{};
         return *this;
     }
 
     ContextSettings &ContextSettings::set_device_index_selection(size_t index) {
-        device_selection_strategy      = DeviceSelectionStrategy::FixedIndex;
+        device_selection_strategy = DeviceSelectionStrategy::FixedIndex;
         device_selection_strategy_impl = FixedIndexStrategy{index};
         return *this;
     }
 
     ContextSettings &ContextSettings::set_custom_device_selector(std::function<vk::PhysicalDevice(const std::vector<vk::PhysicalDevice> &)> selector) {
-        device_selection_strategy      = DeviceSelectionStrategy::CustomStrategy;
+        device_selection_strategy = DeviceSelectionStrategy::CustomStrategy;
         device_selection_strategy_impl = CustomStrategy{std::move(selector)};
         return *this;
     }
 
+    VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT             messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void*                                       pUserData) {
+        std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+        return VK_FALSE;
+    }
+
     Context::Context(const ContextSettings &settings) : m_optional_features(settings.optional_features) {
         glfwInit();
+
+        // Check if Vulkan is supported by GLFW
+        if (!glfwVulkanSupported()) {
+            std::cerr << "GLFW: Vulkan not supported." << std::endl;
+            throw std::runtime_error("GLFW: Vulkan not supported.");
+        }
+
         VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
         vk::ApplicationInfo app_info{};
@@ -45,14 +61,18 @@ namespace neuron {
 
         std::unordered_set<std::string> instance_extensions_set(settings.extra_instance_extensions.begin(), settings.extra_instance_extensions.end());
 
-        uint32_t     count;
+        uint32_t count;
         const char **required_extensions = glfwGetRequiredInstanceExtensions(&count);
+
+        if (required_extensions == nullptr || count == 0) {
+            std::cerr << "Failed to get required instance extensions from GLFW." << std::endl;
+            throw std::runtime_error("Failed to get required instance extensions from GLFW.");
+        }
 
         for (uint32_t i = 0; i < count; ++i) {
             instance_extensions_set.insert(required_extensions[i]);
         }
 
-        // Add VK_KHR_portability_enumeration extension to the set of instance extensions
         instance_extensions_set.insert(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 
         std::unordered_set<std::string> layers_set(settings.extra_layers.begin(), settings.extra_layers.end());
@@ -64,6 +84,40 @@ namespace neuron {
 
         if (settings.enable_api_dump) {
             layers_set.insert("VK_LAYER_LUNARG_api_dump");
+        }
+
+        // Enumerate available instance extensions
+        auto available_extensions = vk::enumerateInstanceExtensionProperties();
+        std::unordered_set<std::string> available_extension_names;
+        std::cout << "Available instance extensions:" << std::endl;
+        for (const auto &ext : available_extensions) {
+            std::cout << "\t" << ext.extensionName << std::endl;
+            available_extension_names.insert(ext.extensionName);
+        }
+
+        // Check that all requested extensions are available
+        for (const auto &requested_ext : instance_extensions_set) {
+            if (available_extension_names.find(requested_ext) == available_extension_names.end()) {
+                std::cerr << "Requested instance extension " << requested_ext << " is not available." << std::endl;
+                throw std::runtime_error("Requested instance extension not available");
+            }
+        }
+
+        // Enumerate available instance layers
+        auto available_layers = vk::enumerateInstanceLayerProperties();
+        std::unordered_set<std::string> available_layer_names;
+        std::cout << "Available instance layers:" << std::endl;
+        for (const auto &layer : available_layers) {
+            std::cout << "\t" << layer.layerName << std::endl;
+            available_layer_names.insert(layer.layerName);
+        }
+
+        // Check that all requested layers are available
+        for (const auto &requested_layer : layers_set) {
+            if (available_layer_names.find(requested_layer) == available_layer_names.end()) {
+                std::cerr << "Requested instance layer " << requested_layer << " is not available." << std::endl;
+                throw std::runtime_error("Requested instance layer not available");
+            }
         }
 
         std::vector<const char *> layers;
@@ -82,58 +136,26 @@ namespace neuron {
         instance_create_info.setPEnabledExtensionNames(instance_extensions);
         instance_create_info.setPEnabledLayerNames(layers);
 
-        // Set VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR flag
         instance_create_info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
 
         vk::DebugUtilsMessengerCreateInfoEXT messenger_create_info{};
 
         if (settings.enable_api_validation) {
-            if (settings.custom_validation_callback.has_value()) {
-                m_debug_user_data                     = new DebugUserData{.fn = settings.custom_validation_callback.value(), .user_data = settings.custom_validation_user_data};
-                messenger_create_info.pfnUserCallback = +[](VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type,
-                                                            const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *userData) {
-                    const auto *user_data = static_cast<DebugUserData *>(userData);
-                    return static_cast<VkBool32>(user_data->fn(static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(severity),
-                                                               static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(type),
-                                                               reinterpret_cast<const vk::DebugUtilsMessengerCallbackDataEXT *>(callback_data), user_data->user_data));
-                };
-            } else {
-                messenger_create_info.pfnUserCallback = +[](VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type,
-                                                            const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *userData) {
-                    switch (severity) {
-                    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-                        std::cerr << "[validation] (debug) " << callback_data->pMessage << '\n';
-                        break;
-                    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-                        std::cerr << "[validation] (info ) " << callback_data->pMessage << '\n';
-                        break;
-                    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-                        std::cerr << "[validation] (warn ) " << callback_data->pMessage << '\n';
-                        break;
-                    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-                        std::cerr << "[validation] (error) " << callback_data->pMessage << '\n';
-                        break;
-                    default:
-                        // weirdly needed to escape this to avoid anyone from making a trigraph here (because those are relevant in today's world.
-                        // we don't have curly braces we have curly braces at home; curly braces at home: ??<
-                        std::cerr << "[validation] (????\?)" << callback_data->pMessage << '\n';
-                        break;
-                    }
-
-                    return VK_FALSE;
-                };
-            }
-
-            messenger_create_info.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
-                vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
-            messenger_create_info.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
-                vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding;
+            messenger_create_info.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+                vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+                vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+                vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+            messenger_create_info.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
+                vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+            messenger_create_info.pfnUserCallback = debugCallback; // Set the callback function
+            messenger_create_info.pUserData = nullptr;             // Optional
 
             instance_create_info.pNext = &messenger_create_info;
         }
 
+        // Create the Vulkan instance
         m_instance = vk::createInstance(instance_create_info);
-
         VULKAN_HPP_DEFAULT_DISPATCHER.init(m_instance);
 
         if (settings.enable_api_validation) {
@@ -148,7 +170,6 @@ namespace neuron {
                 vk::PhysicalDeviceProperties properties = physical_device.getProperties();
                 if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
                     m_physical_device = physical_device;
-                    ;
                     break;
                 }
             }
@@ -158,7 +179,6 @@ namespace neuron {
             if (index >= physical_devices.size()) {
                 throw std::runtime_error("Fixed physical device index out of range (GPU does not exist).");
             }
-
             m_physical_device = physical_devices[index];
         } break;
         case DeviceSelectionStrategy::CustomStrategy:
@@ -166,38 +186,36 @@ namespace neuron {
             break;
         }
 
+        if (!m_physical_device) {
+            throw std::runtime_error("Failed to select a valid physical device.");
+        }
+
         vk::PhysicalDeviceProperties properties = m_physical_device.getProperties();
-
         std::cout << "Selected GPU: " << properties.deviceName << '\n';
-
-        // TODO: non-naive queue family selection
 
         std::optional<uint32_t> mqf;
         std::optional<uint32_t> tqf;
         std::optional<uint32_t> cqf;
 
-        auto     queue_family_properties = m_physical_device.getQueueFamilyProperties();
-        uint32_t qi                      = 0;
+        auto queue_family_properties = m_physical_device.getQueueFamilyProperties();
+        uint32_t qi = 0;
         for (const auto &qfp : queue_family_properties) {
             if (!mqf.has_value() && qfp.queueFlags & vk::QueueFlagBits::eGraphics && glfwGetPhysicalDevicePresentationSupport(m_instance, m_physical_device, qi)) {
                 mqf = qi;
             }
-
             if (!tqf.has_value() && qfp.queueFlags & vk::QueueFlagBits::eTransfer && !(qfp.queueFlags & vk::QueueFlagBits::eGraphics) &&
                 !(qfp.queueFlags & vk::QueueFlagBits::eCompute)) {
                 tqf = qi;
             }
-
             if (!cqf.has_value() && qfp.queueFlags & vk::QueueFlagBits::eCompute && !(qfp.queueFlags & vk::QueueFlagBits::eGraphics)) {
                 cqf = qi;
             }
-
             qi++;
         }
 
-        m_main_queue_family     = mqf.value();
+        m_main_queue_family = mqf.value();
         m_transfer_queue_family = tqf.value_or(m_main_queue_family);
-        m_compute_queue_family  = cqf.value_or(m_main_queue_family);
+        m_compute_queue_family = cqf.value_or(m_main_queue_family);
 
         std::array<float, 1> queue_priorities = {1.0f};
 
@@ -220,28 +238,29 @@ namespace neuron {
             device_extensions.push_back(extension.c_str());
         }
 
-        vk::PhysicalDeviceFeatures2        f2{};
+        vk::PhysicalDeviceFeatures2 f2{};
         vk::PhysicalDeviceVulkan11Features v11f{};
         vk::PhysicalDeviceVulkan12Features v12f{};
         vk::PhysicalDeviceVulkan13Features v13f{};
 
-        f2.pNext   = &v11f;
+        f2.pNext = &v11f;
         v11f.pNext = &v12f;
         v12f.pNext = &v13f;
 
-        v13f.dynamicRendering          = true;
-        v13f.synchronization2          = true;
-        v12f.timelineSemaphore         = true;
-        f2.features.geometryShader     = true;
+        v13f.dynamicRendering = true;
+        v13f.synchronization2 = true;
+        v12f.timelineSemaphore = true;
+        f2.features.geometryShader = true;
         f2.features.tessellationShader = true;
-        f2.features.largePoints        = true;
-        f2.features.wideLines          = true;
-        f2.features.imageCubeArray     = true;
+        f2.features.largePoints = true;
+        f2.features.wideLines = true;
+        f2.features.imageCubeArray = true;
 
         vk::DeviceCreateInfo device_create_info{};
         device_create_info.setQueueCreateInfos(queue_create_infos);
         device_create_info.setPEnabledExtensionNames(device_extensions);
         device_create_info.setPNext(&f2);
+        device_create_info.setPEnabledLayerNames({});  // Device layers are deprecated; set to empty
 
         m_device = m_physical_device.createDevice(device_create_info);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(m_device);

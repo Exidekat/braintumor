@@ -26,3 +26,7 @@ CMakeDoxyfile.in
 CMakeDoxygenDefaults.cmake
 Makefile
 cmake_install.cmake
+
+.idea*
+example/example
+Neuron.cbp

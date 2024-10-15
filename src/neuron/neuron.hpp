@@ -75,7 +75,7 @@ namespace neuron {
 
     class CommandPool;
 
-    class NEURON_API Context final {
+    class NEURON_API Context final : public std::enable_shared_from_this<Context> {
         explicit Context(const ContextSettings &settings);
       public:
 
