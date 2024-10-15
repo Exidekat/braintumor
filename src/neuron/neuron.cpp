@@ -53,7 +53,7 @@ namespace neuron {
         VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
         vk::ApplicationInfo app_info{};
-        app_info.setApiVersion(vk::ApiVersion13);
+        app_info.setApiVersion(vk::ApiVersion12);
         app_info.setEngineVersion(vk::makeApiVersion(0, NEURON_VERSION_MAJOR, NEURON_VERSION_MINOR, NEURON_VERSION_PATCH));
         app_info.setApplicationVersion(vk::makeApiVersion(0U, settings.application_version.major, settings.application_version.minor, settings.application_version.patch));
         app_info.setPEngineName("Neuron");
@@ -130,6 +130,10 @@ namespace neuron {
         for (const auto &layer : layers_set) {
             layers.push_back(layer.c_str());
         }
+
+        // Add VK_KHR_portability to instance extensions if not already added
+        instance_extensions_set.insert(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        //instance_extensions_set.insert("VK_KHR_portability_subset"); //todo; find the portability subset def
 
         vk::InstanceCreateInfo instance_create_info{};
         instance_create_info.setPApplicationInfo(&app_info);
@@ -248,6 +252,8 @@ namespace neuron {
 
         std::unordered_set<std::string> device_extensions_set(settings.extra_device_extensions.begin(), settings.extra_device_extensions.end());
         device_extensions_set.insert(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        device_extensions_set.insert(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+        //device_extensions_set.insert(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
 
         std::vector<const char *> device_extensions;
         for (const auto &extension : device_extensions_set) {
@@ -257,30 +263,60 @@ namespace neuron {
         vk::PhysicalDeviceFeatures2 f2{};
         vk::PhysicalDeviceVulkan11Features v11f{};
         vk::PhysicalDeviceVulkan12Features v12f{};
-        vk::PhysicalDeviceVulkan13Features v13f{};
+        // Downgrading to v12 temporarily :(
+        //vk::PhysicalDeviceVulkan13Features v13f{};
 
+        // Initialize the portability subset features todo; figure out why vulkan hates this
+        //vk::PhysicalDevicePortabilitySubsetFeaturesKHR portabilitySubsetFeatures{};
+        //portabilitySubsetFeatures.portabilitySubset = VK_TRUE;
+
+        // Initialize the dynamic rendering features
+        vk::PhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeatures{};
+        dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
+
+        // Add to the pNext chain
         f2.pNext = &v11f;
         v11f.pNext = &v12f;
-        v12f.pNext = &v13f;
+        v12f.pNext = &dynamicRenderingFeatures;
+        dynamicRenderingFeatures.pNext = nullptr; // End of pNext chain
+        //v12f.pNext = &portabilitySubsetFeatures;
+        //portabilitySubsetFeatures.pNext = nullptr; // End of pNext chain
 
-        v13f.dynamicRendering = true;
-        v13f.synchronization2 = true;
         v12f.timelineSemaphore = true;
-        f2.features.geometryShader = true;
-        f2.features.tessellationShader = true;
-        f2.features.largePoints = true;
-        f2.features.wideLines = true;
-        f2.features.imageCubeArray = true;
 
+        // Adjust features based on what's supported
+        vk::PhysicalDeviceFeatures2 supportedFeatures = m_physical_device.getFeatures2();
+
+        if (supportedFeatures.features.geometryShader) {
+            f2.features.geometryShader = true;
+        }
+        if (supportedFeatures.features.tessellationShader) {
+            f2.features.tessellationShader = true;
+        }
+        if (supportedFeatures.features.imageCubeArray) {
+            f2.features.imageCubeArray = true;
+        }
+        if (supportedFeatures.features.wideLines) {
+            f2.features.wideLines = true;
+        } else {
+            std::cout << "Wide lines not supported on this device." << std::endl;
+        }
+        if (supportedFeatures.features.largePoints) {
+            f2.features.largePoints = true;
+        } else {
+            std::cout << "Large points not supported on this device." << std::endl;
+        }
+
+        // Set up the device create info
         vk::DeviceCreateInfo device_create_info{};
         device_create_info.setQueueCreateInfos(queue_create_infos);
         device_create_info.setPEnabledExtensionNames(device_extensions);
         device_create_info.setPNext(&f2);
-        device_create_info.setPEnabledLayerNames({});  // Device layers are deprecated; set to empty
+        device_create_info.setPEnabledLayerNames({});
 
+        // Create the logical device and pray
         m_device = m_physical_device.createDevice(device_create_info);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(m_device);
-
 
         m_main_queue     = m_device.getQueue(m_main_queue_family, 0);
         m_transfer_queue = m_device.getQueue(m_transfer_queue_family, 0);
