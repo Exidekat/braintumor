@@ -12,7 +12,7 @@ namespace neuron::render {
         std::ifstream file(path.string(), std::ios::ate | std::ios::in);
 
         if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file");
+            throw std::runtime_error("Failed to open file" + path.string());
         }
 
         auto  file_size = static_cast<std::streamsize>(file.tellg());
@@ -30,7 +30,7 @@ namespace neuron::render {
         std::ifstream file(path.string(), std::ios::ate | std::ios::in | std::ios::binary);
 
         if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file");
+            throw std::runtime_error("Failed to open file: " + path.string());
         }
 
         auto                  file_size   = file.tellg();
